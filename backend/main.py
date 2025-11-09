@@ -5,6 +5,7 @@ Entry point for the Hotel Management System API.
 UPDATED: 
 - Day 4: Added customers router for Customer Management module
 - Day 5: Added bookings router for Booking Management module
+- Day 6: Added billing router for Billing & Payment Management module
 """
 
 from fastapi import FastAPI
@@ -12,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from database import engine, Base
-from routers import auth, rooms, customers, bookings  # <-- UPDATED: Added bookings import
+from routers import auth, rooms, customers, bookings, billing  # <-- UPDATED: Added billing import
 from models import User, Room, Customer, Booking, Payment
 
 # Create database tables
@@ -21,7 +22,7 @@ Base.metadata.create_all(bind=engine)
 # Initialize FastAPI app
 app = FastAPI(
     title="Hotel Management System API",
-    description="Backend API for Hotel Management System with Booking Management",
+    description="Backend API for Hotel Management System with Booking & Billing Management",
     version="1.0.0"
 )
 
@@ -38,7 +39,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(rooms.router)
 app.include_router(customers.router)
-app.include_router(bookings.router)  # <-- UPDATED: Added bookings router for Day 5
+app.include_router(bookings.router)
+app.include_router(billing.router)  # <-- UPDATED: Added billing router for Day 6
 
 # Health check endpoint
 @app.get("/")
