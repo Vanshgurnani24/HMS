@@ -1,5 +1,11 @@
+"""
+Customer Management Router
+Handles customer registration, profile management, and document upload.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, func
 from typing import Optional, List
 from datetime import date, datetime
 import os
@@ -37,18 +43,27 @@ def validate_file(file: UploadFile) -> None:
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+            detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+    
+    # Check file size (read file to memory to get size)
+    file.file.seek(0, 2)  # Seek to end
+    file_size = file.file.tell()
+    file.file.seek(0)  # Reset to start
+    
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE / (1024*1024):.1f}MB"
         )
 
 
 def save_upload_file(upload_file: UploadFile, customer_id: int) -> str:
     """Save uploaded file and return the file path"""
-    # Generate unique filename
     file_ext = Path(upload_file.filename).suffix.lower()
-    unique_filename = f"customer_{customer_id}_{uuid.uuid4()}{file_ext}"
-    file_path = UPLOAD_DIR / unique_filename
+    file_name = f"customer_{customer_id}_{uuid.uuid4().hex[:8]}{file_ext}"
+    file_path = UPLOAD_DIR / file_name
     
-    # Save file
     with file_path.open("wb") as buffer:
         shutil.copyfileobj(upload_file.file, buffer)
     
@@ -56,26 +71,27 @@ def save_upload_file(upload_file: UploadFile, customer_id: int) -> str:
 
 
 @router.post("/", response_model=CustomerResponse, status_code=status.HTTP_201_CREATED)
-async def add_customer(
-    first_name: str = Form(..., description="Customer's first name"),
-    last_name: str = Form(..., description="Customer's last name"),
-    email: str = Form(..., description="Valid email address (unique)"),
-    phone: str = Form(..., description="Contact number"),
-    address: Optional[str] = Form(None, description="Street address"),
-    city: Optional[str] = Form(None, description="City name"),
-    state: Optional[str] = Form(None, description="State/Province"),
-    country: Optional[str] = Form(None, description="Country"),
-    zip_code: Optional[str] = Form(None, description="Postal code"),
-    id_type: Optional[str] = Form(None, description="Type of ID (passport, driver_license, adhaar, national_id)"),
-    id_number: Optional[str] = Form(None, description="ID number"),
-    date_of_birth: Optional[str] = Form(None, description="Date of birth (YYYY-MM-DD format, e.g., 2004-11-15)"),
-    id_proof: Optional[UploadFile] = File(None, description="ID proof document (JPG, PNG, or PDF, max 5MB)"),
+async def create_customer(
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(...),
+    address: Optional[str] = Form(None),
+    city: Optional[str] = Form(None),
+    state: Optional[str] = Form(None),
+    country: Optional[str] = Form(None),
+    zip_code: Optional[str] = Form(None),
+    id_type: Optional[str] = Form(None),
+    id_number: Optional[str] = Form(None),
+    date_of_birth: Optional[str] = Form(None),
+    id_proof: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.STAFF]))
 ):
     """
-    Create a new customer with optional ID proof upload.
+    Create a new customer profile.
     
+    **Required Fields:**
     - **first_name**: Customer's first name (required)
     - **last_name**: Customer's last name (required)
     - **email**: Valid email address (required, unique)
@@ -198,15 +214,28 @@ def search_customers(
     """
     Search customers by name, email, or phone.
     
-    - **query**: Search term (searches in first_name, last_name, email, phone)
+    - **query**: Search term (searches in first_name, last_name, full name, email, phone)
+    
+    This endpoint now supports:
+    - First name only: "John"
+    - Last name only: "Doe"
+    - Full name: "John Doe"
+    - Email: "john@example.com"
+    - Phone: "1234567890"
     """
     search_pattern = f"%{query}%"
     
+    # SQLite concatenation for full name search
+    full_name = func.concat(Customer.first_name, ' ', Customer.last_name)
+    
     customers = db.query(Customer).filter(
-        (Customer.first_name.ilike(search_pattern)) |
-        (Customer.last_name.ilike(search_pattern)) |
-        (Customer.email.ilike(search_pattern)) |
-        (Customer.phone.ilike(search_pattern))
+        or_(
+            Customer.first_name.ilike(search_pattern),
+            Customer.last_name.ilike(search_pattern),
+            Customer.email.ilike(search_pattern),
+            Customer.phone.ilike(search_pattern),
+            full_name.ilike(search_pattern)
+        )
     ).all()
     
     return {"customers": customers}

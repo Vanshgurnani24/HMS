@@ -61,7 +61,7 @@ def validate_booking_for_payment(db: Session, booking_id: int) -> Booking:
     return booking
 
 
-@router.post("/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
 def create_payment(
     payment: PaymentCreate,
     db: Session = Depends(get_db),
@@ -127,7 +127,7 @@ def create_payment(
     return response_dict
 
 
-@router.get("/payments", response_model=PaymentListResponse)
+@router.get("/", response_model=PaymentListResponse)
 def get_payments(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=100, description="Maximum records to return"),
@@ -180,7 +180,7 @@ def get_payments(
     }
 
 
-@router.get("/payments/{payment_id}", response_model=PaymentResponse)
+@router.get("/{payment_id}", response_model=PaymentResponse)
 def get_payment(
     payment_id: int,
     db: Session = Depends(get_db),
@@ -205,7 +205,7 @@ def get_payment(
     return response_dict
 
 
-@router.get("/payments/transaction/{transaction_id}", response_model=PaymentResponse)
+@router.get("/transaction/{transaction_id}", response_model=PaymentResponse)
 def get_payment_by_transaction(
     transaction_id: str,
     db: Session = Depends(get_db),
@@ -232,7 +232,7 @@ def get_payment_by_transaction(
     return response_dict
 
 
-@router.patch("/payments/{payment_id}/status", response_model=PaymentResponse)
+@router.patch("/{payment_id}/status", response_model=PaymentResponse)
 def update_payment_status(
     payment_id: int,
     payment_update: PaymentUpdate,
@@ -240,15 +240,16 @@ def update_payment_status(
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.STAFF]))
 ):
     """
-    Update payment status (mark as completed, failed, or refunded).
+    Update payment status (e.g., mark as completed or failed).
     
-    **Status Flow:**
-    - PENDING → COMPLETED (payment successful)
-    - PENDING → FAILED (payment failed)
-    - COMPLETED → REFUNDED (refund processed)
+    **Status Transitions:**
+    - PENDING → COMPLETED (when payment is successful)
+    - PENDING → FAILED (when payment fails)
+    - Any status → REFUNDED (for refunds)
     
-    **Automatic Actions:**
-    - COMPLETED: Sets payment_date to current timestamp
+    **Updates:**
+    - Sets payment_date when marked as COMPLETED
+    - Allows updating reference_number and notes
     """
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     
@@ -258,18 +259,20 @@ def update_payment_status(
             detail=f"Payment with ID {payment_id} not found"
         )
     
-    # Update status
+    # Update payment status
     if payment_update.payment_status:
         payment.payment_status = payment_update.payment_status
         
-        # Set payment date when marked as completed
+        # Set payment date when completed
         if payment_update.payment_status == PaymentStatus.COMPLETED and not payment.payment_date:
-            payment.payment_date = datetime.utcnow()
+            payment.payment_date = datetime.now()
     
-    # Update other fields
-    if payment_update.reference_number:
+    # Update reference number if provided
+    if payment_update.reference_number is not None:
         payment.reference_number = payment_update.reference_number
-    if payment_update.notes:
+    
+    # Update notes if provided
+    if payment_update.notes is not None:
         payment.notes = payment_update.notes
     
     db.commit()
@@ -283,6 +286,96 @@ def update_payment_status(
     return response_dict
 
 
+@router.post("/{payment_id}/refund", response_model=RefundResponse)
+def refund_payment(
+    payment_id: int,
+    refund_request: RefundRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role([UserRole.ADMIN]))
+):
+    """
+    Process a payment refund (Admin only).
+    
+    **Process:**
+    1. Validates payment exists and is refundable
+    2. Marks payment as REFUNDED
+    3. Records refund reason and date
+    
+    **Business Rules:**
+    - Only COMPLETED payments can be refunded
+    - Partial refunds not supported (full refund only)
+    """
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Payment with ID {payment_id} not found"
+        )
+    
+    if payment.payment_status != PaymentStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only completed payments can be refunded"
+        )
+    
+    # Update payment to refunded status
+    payment.payment_status = PaymentStatus.REFUNDED
+    payment.notes = f"REFUNDED: {refund_request.reason}. Original notes: {payment.notes or 'None'}"
+    
+    db.commit()
+    db.refresh(payment)
+    
+    return RefundResponse(
+        payment_id=payment.id,
+        transaction_id=payment.transaction_id,
+        refund_amount=payment.amount,
+        refund_status="success",
+        refund_date=datetime.now(),
+        message="Payment refunded successfully"
+    )
+
+
+@router.get("/booking/{booking_id}/summary", response_model=PaymentSummary)
+def get_booking_payment_summary(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get payment summary for a specific booking.
+    
+    Shows total paid, pending, and refunded amounts.
+    """
+    # Get booking
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    
+    if not booking:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Booking with ID {booking_id} not found"
+        )
+    
+    # Get all payments for this booking
+    payments = db.query(Payment).filter(Payment.booking_id == booking_id).all()
+    
+    # Calculate totals
+    total_paid = sum(p.amount for p in payments if p.payment_status == PaymentStatus.COMPLETED)
+    total_pending = sum(p.amount for p in payments if p.payment_status == PaymentStatus.PENDING)
+    total_refunded = sum(p.amount for p in payments if p.payment_status == PaymentStatus.REFUNDED)
+    
+    return PaymentSummary(
+        booking_id=booking_id,
+        booking_reference=booking.booking_reference,
+        total_amount=booking.final_amount,
+        total_paid=total_paid,
+        total_pending=total_pending,
+        total_refunded=total_refunded,
+        balance_due=booking.final_amount - total_paid,
+        payment_count=len(payments)
+    )
+
+
 @router.get("/invoices/booking/{booking_id}", response_model=InvoiceResponse)
 def get_invoice_by_booking(
     booking_id: int,
@@ -290,7 +383,7 @@ def get_invoice_by_booking(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Generate and fetch complete invoice for a booking.
+    Generate and retrieve invoice for a booking.
     
     **Invoice Details Include:**
     - Booking information
@@ -375,7 +468,7 @@ def get_invoice_by_payment(
     return get_invoice_by_booking(payment.booking_id, db, current_user)
 
 
-@router.get("/payments/booking/{booking_id}/history", response_model=PaymentListResponse)
+@router.get("/booking/{booking_id}/history", response_model=PaymentListResponse)
 def get_booking_payment_history(
     booking_id: int,
     db: Session = Depends(get_db),
@@ -384,10 +477,11 @@ def get_booking_payment_history(
     """
     Get complete payment history for a booking.
     
-    Useful for tracking multiple payment attempts or partial payments.
+    Shows all payment attempts, including pending, completed, failed, and refunded.
     """
-    # Validate booking exists
+    # Verify booking exists
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    
     if not booking:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -399,6 +493,7 @@ def get_booking_payment_history(
         Payment.booking_id == booking_id
     ).order_by(Payment.created_at.desc()).all()
     
+    # Add invoice numbers to responses
     payments_with_invoice = []
     for payment in payments:
         payment_dict = {
@@ -408,130 +503,6 @@ def get_booking_payment_history(
         payments_with_invoice.append(payment_dict)
     
     return {
-        "total": len(payments),
+        "total": len(payments_with_invoice),
         "payments": payments_with_invoice
     }
-
-
-@router.get("/summary", response_model=PaymentSummary)
-def get_payment_summary(
-    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role([UserRole.ADMIN]))
-):
-    """
-    Get payment summary statistics (Admin only).
-    
-    **Metrics Include:**
-    - Total payments count and amount
-    - Completed payments count and amount
-    - Pending payments count and amount
-    - Failed payments count and amount
-    - Payment method distribution
-    
-    **Filters:**
-    - **start_date**: Filter from date (YYYY-MM-DD)
-    - **end_date**: Filter to date (YYYY-MM-DD)
-    """
-    query = db.query(Payment)
-    
-    # Apply date filters
-    if start_date:
-        query = query.filter(Payment.created_at >= start_date)
-    if end_date:
-        query = query.filter(Payment.created_at <= end_date)
-    
-    # Get all payments
-    all_payments = query.all()
-    
-    # Calculate summary statistics
-    total_payments = len(all_payments)
-    total_amount = sum(p.amount for p in all_payments)
-    
-    completed = [p for p in all_payments if p.payment_status == PaymentStatus.COMPLETED]
-    completed_payments = len(completed)
-    completed_amount = sum(p.amount for p in completed)
-    
-    pending = [p for p in all_payments if p.payment_status == PaymentStatus.PENDING]
-    pending_payments = len(pending)
-    pending_amount = sum(p.amount for p in pending)
-    
-    failed = [p for p in all_payments if p.payment_status == PaymentStatus.FAILED]
-    failed_payments = len(failed)
-    failed_amount = sum(p.amount for p in failed)
-    
-    # Payment method distribution
-    payment_methods = {}
-    for payment in all_payments:
-        method = payment.payment_method.value
-        payment_methods[method] = payment_methods.get(method, 0) + 1
-    
-    return PaymentSummary(
-        total_payments=total_payments,
-        total_amount=round(total_amount, 2),
-        completed_payments=completed_payments,
-        completed_amount=round(completed_amount, 2),
-        pending_payments=pending_payments,
-        pending_amount=round(pending_amount, 2),
-        failed_payments=failed_payments,
-        failed_amount=round(failed_amount, 2),
-        payment_methods=payment_methods
-    )
-
-
-@router.post("/refund", response_model=RefundResponse)
-def process_refund(
-    refund_request: RefundRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role([UserRole.ADMIN]))
-):
-    """
-    Process refund for a payment (Admin only).
-    
-    **Business Rules:**
-    - Can only refund COMPLETED payments
-    - Refund amount cannot exceed original payment amount
-    - Payment status changes to REFUNDED
-    - Original payment record is preserved
-    
-    **Note:** In production, integrate with payment gateway for actual refund processing.
-    """
-    # Get the payment
-    payment = db.query(Payment).filter(Payment.id == refund_request.payment_id).first()
-    
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Payment with ID {refund_request.payment_id} not found"
-        )
-    
-    # Validate payment is completed
-    if payment.payment_status != PaymentStatus.COMPLETED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Can only refund completed payments"
-        )
-    
-    # Validate refund amount
-    if refund_request.refund_amount > payment.amount:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Refund amount (${refund_request.refund_amount}) cannot exceed payment amount (${payment.amount})"
-        )
-    
-    # Update payment status to refunded
-    payment.payment_status = PaymentStatus.REFUNDED
-    payment.notes = f"{payment.notes or ''}\nRefund: ${refund_request.refund_amount} - {refund_request.reason}"
-    
-    db.commit()
-    db.refresh(payment)
-    
-    return RefundResponse(
-        payment_id=payment.id,
-        original_amount=payment.amount,
-        refund_amount=refund_request.refund_amount,
-        refund_date=datetime.utcnow(),
-        reason=refund_request.reason,
-        status="refunded"
-    )
