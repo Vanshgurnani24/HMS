@@ -1,8 +1,6 @@
 """
 Main FastAPI Application
 Entry point for the Hotel Management System API.
-
-UPDATED Day 7: Added reports router for analytics and reporting module.
 """
 
 from fastapi import FastAPI
@@ -10,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from database import engine, Base
-from routers import auth, rooms, customers, reports  # <-- UPDATED: Added reports import
+from routers import auth, rooms, customers, bookings, payments  # ← ADD bookings, payments
 from models import User, Room, Customer, Booking, Payment
 
 # Create database tables
@@ -19,7 +17,7 @@ Base.metadata.create_all(bind=engine)
 # Initialize FastAPI app
 app = FastAPI(
     title="Hotel Management System API",
-    description="Backend API for Hotel Management System - Now with Reports & Analytics",
+    description="Backend API for Hotel Management System",
     version="1.0.0"
 )
 
@@ -36,16 +34,13 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(rooms.router)
 app.include_router(customers.router)
-app.include_router(reports.router)  # <-- UPDATED: Added reports router for Day 7
+app.include_router(bookings.router)  # ← ADD THIS
+app.include_router(payments.router)  # ← ADD THIS
 
 # Health check endpoint
 @app.get("/")
 async def root():
-    return {
-        "message": "Hotel Management System API is running",
-        "version": "1.0.0",
-        "modules": ["auth", "rooms", "customers", "bookings", "payments", "reports"]
-    }
+    return {"message": "Hotel Management System API is running"}
 
 # Ping endpoint for testing
 @app.get("/ping")
