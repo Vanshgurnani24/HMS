@@ -51,9 +51,9 @@ const Bookings = () => {
     try {
       setLoading(true)
       const [bookingsRes, roomsRes, customersRes] = await Promise.all([
-        bookingsAPI.getBookings({ limit: 1000 }),
-        roomsAPI.getRooms({ limit: 1000 }),
-        customersAPI.getCustomers({ limit: 1000 }),
+        bookingsAPI.getBookings(),
+        roomsAPI.getRooms(),
+        customersAPI.getCustomers(),
       ])
       setBookings(bookingsRes.data.bookings || [])
       setRooms(roomsRes.data.rooms || [])

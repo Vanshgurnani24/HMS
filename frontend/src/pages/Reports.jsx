@@ -42,10 +42,10 @@ const Reports = () => {
     try {
       setLoading(true)
       const [roomsRes, customersRes, bookingsRes, paymentsRes] = await Promise.all([
-        roomsAPI.getRooms({ limit: 1000 }),
-        customersAPI.getCustomers({ limit: 1000 }),
-        bookingsAPI.getBookings({ limit: 1000 }),
-        paymentsAPI.getPayments({ limit: 1000 }),
+        roomsAPI.getRooms(),
+        customersAPI.getCustomers(),
+        bookingsAPI.getBookings(),
+        paymentsAPI.getPayments(),
       ])
 
       const fetchedData = {

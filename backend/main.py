@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from database import engine, Base
-from routers import auth, rooms, customers, bookings, payments  # ← ADD bookings, payments
+from routers import auth, rooms, customers, bookings, billing
 from models import User, Room, Customer, Booking, Payment
 
 # Create database tables
@@ -34,8 +34,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(rooms.router)
 app.include_router(customers.router)
-app.include_router(bookings.router)  # ← ADD THIS
-app.include_router(payments.router)  # ← ADD THIS
+app.include_router(bookings.router)
+app.include_router(billing.router)
 
 # Health check endpoint
 @app.get("/")

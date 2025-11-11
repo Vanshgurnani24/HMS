@@ -53,7 +53,7 @@ const Customers = () => {
   const fetchCustomers = async () => {
     try {
       setLoading(true)
-      const response = await customersAPI.getCustomers({ limit: 1000 })
+      const response = await customersAPI.getCustomers()
       setCustomers(response.data.customers || [])
     } catch (error) {
       console.error('Error fetching customers:', error)
@@ -349,7 +349,7 @@ const Customers = () => {
               value={formData.id_type}
               onChange={handleChange}
               fullWidth
-              placeholder="e.g., Passport, Adhaar"
+              placeholder="e.g., Passport, Aadhaar"
             />
             <TextField
               label="ID Number"

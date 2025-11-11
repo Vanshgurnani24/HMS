@@ -29,7 +29,7 @@ from schemas.payment_schema import (
 )
 from utils.auth import get_current_user, require_role
 
-router = APIRouter(prefix="/billing", tags=["Billing & Payment Management"])
+router = APIRouter(prefix="/payments", tags=["Billing & Payment Management"])
 
 
 def generate_transaction_id() -> str:
@@ -113,10 +113,6 @@ def create_payment(
         reference_number=payment.reference_number,
         notes=payment.notes
     )
-    
-    # Store invoice number in notes or add invoice_no field
-    # For now, we'll use transaction_id as invoice reference
-    # In production, you might add an invoice_no column to Payment model
     
     db.add(new_payment)
     db.commit()
@@ -296,18 +292,15 @@ def get_invoice_by_booking(
     """
     Generate and fetch complete invoice for a booking.
     
-    **Invoice Includes:**
-    - Invoice number (auto-generated)
+    **Invoice Details Include:**
+    - Booking information
     - Customer details
-    - Room details
-    - Booking dates and nights
-    - Itemized charges
+    - Room information
+    - Itemized charges breakdown
     - Payment information
-    - Tax and discount breakdown
-    
-    **Invoice Format:** INV-yyyyMMddHHmmss
+    - Total amount with tax
     """
-    # Get booking with related data
+    # Get booking with relationships
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     
     if not booking:
@@ -316,63 +309,46 @@ def get_invoice_by_booking(
             detail=f"Booking with ID {booking_id} not found"
         )
     
-    # Get payment information
+    # Get associated payment
     payment = db.query(Payment).filter(Payment.booking_id == booking_id).first()
     
-    # Generate invoice number
-    invoice_no = f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No payment found for booking {booking_id}"
+        )
     
     # Build invoice items
-    items = []
+    items = [
+        InvoiceItemDetail(
+            description=f"Room {booking.room.room_number} - {booking.room.room_type.value.title()}",
+            quantity=booking.number_of_nights,
+            unit_price=booking.room_price,
+            amount=booking.total_amount
+        )
+    ]
     
-    # Room charges
-    items.append(InvoiceItemDetail(
-        description=f"Room Charges - {booking.room.room_type.value.title()} Room ({booking.room.room_number})",
-        quantity=booking.number_of_nights,
-        unit_price=booking.room_price,
-        amount=booking.total_amount
-    ))
-    
-    # Build complete invoice
+    # Create invoice response
     invoice = InvoiceResponse(
-        # Invoice Details
-        invoice_no=invoice_no,
-        invoice_date=datetime.utcnow(),
-        
-        # Booking Details
+        invoice_no=f"INV-{payment.transaction_id}",
+        booking_id=booking.id,
         booking_reference=booking.booking_reference,
-        check_in_date=booking.check_in_date,
-        check_out_date=booking.check_out_date,
-        number_of_nights=booking.number_of_nights,
-        
-        # Customer Details
         customer_name=f"{booking.customer.first_name} {booking.customer.last_name}",
         customer_email=booking.customer.email,
         customer_phone=booking.customer.phone,
-        customer_address=booking.customer.address,
-        
-        # Room Details
         room_number=booking.room.room_number,
-        room_type=booking.room.room_type.value,
-        
-        # Invoice Items
+        check_in_date=booking.check_in_date,
+        check_out_date=booking.check_out_date,
+        number_of_nights=booking.number_of_nights,
         items=items,
-        
-        # Amounts
-        subtotal=booking.total_amount - booking.discount,
+        subtotal=booking.total_amount,
         discount=booking.discount,
         tax=booking.tax,
         total_amount=booking.final_amount,
-        
-        # Payment Details
-        payment_status=payment.payment_status if payment else PaymentStatus.PENDING,
-        payment_method=payment.payment_method.value if payment else None,
-        payment_date=payment.payment_date if payment else None,
-        transaction_id=payment.transaction_id if payment else None,
-        
-        # Additional Info
-        special_requests=booking.special_requests,
-        notes=payment.notes if payment else None
+        payment_status=payment.payment_status.value,
+        payment_method=payment.payment_method.value,
+        payment_date=payment.payment_date,
+        created_at=payment.created_at
     )
     
     return invoice
@@ -521,7 +497,7 @@ def process_refund(
     
     **Note:** In production, integrate with payment gateway for actual refund processing.
     """
-    # Get payment
+    # Get the payment
     payment = db.query(Payment).filter(Payment.id == refund_request.payment_id).first()
     
     if not payment:
@@ -530,23 +506,23 @@ def process_refund(
             detail=f"Payment with ID {refund_request.payment_id} not found"
         )
     
-    # Validate payment can be refunded
+    # Validate payment is completed
     if payment.payment_status != PaymentStatus.COMPLETED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Can only refund COMPLETED payments. Current status: {payment.payment_status.value}"
+            detail="Can only refund completed payments"
         )
     
     # Validate refund amount
     if refund_request.refund_amount > payment.amount:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Refund amount (${refund_request.refund_amount:.2f}) cannot exceed payment amount (${payment.amount:.2f})"
+            detail=f"Refund amount (${refund_request.refund_amount}) cannot exceed payment amount (${payment.amount})"
         )
     
-    # Process refund
+    # Update payment status to refunded
     payment.payment_status = PaymentStatus.REFUNDED
-    payment.notes = f"REFUND: {refund_request.reason}. Original notes: {payment.notes or 'N/A'}"
+    payment.notes = f"{payment.notes or ''}\nRefund: ${refund_request.refund_amount} - {refund_request.reason}"
     
     db.commit()
     db.refresh(payment)
@@ -555,44 +531,7 @@ def process_refund(
         payment_id=payment.id,
         original_amount=payment.amount,
         refund_amount=refund_request.refund_amount,
-        refund_status=PaymentStatus.REFUNDED,
         refund_date=datetime.utcnow(),
-        reason=refund_request.reason
+        reason=refund_request.reason,
+        status="refunded"
     )
-
-
-@router.delete("/payments/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_payment(
-    payment_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role([UserRole.ADMIN]))
-):
-    """
-    Delete a payment record (Admin only).
-    
-    **Warning:** This permanently deletes the payment record.
-    Consider using refund functionality instead for completed payments.
-    
-    **Use Cases:**
-    - Removing duplicate payment entries
-    - Correcting data entry errors
-    """
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Payment with ID {payment_id} not found"
-        )
-    
-    # Prevent deletion of completed payments (use refund instead)
-    if payment.payment_status == PaymentStatus.COMPLETED:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete COMPLETED payment. Use refund functionality instead."
-        )
-    
-    db.delete(payment)
-    db.commit()
-    
-    return None

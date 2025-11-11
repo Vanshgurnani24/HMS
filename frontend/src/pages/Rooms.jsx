@@ -49,7 +49,7 @@ const Rooms = () => {
   const fetchRooms = async () => {
     try {
       setLoading(true)
-      const response = await roomsAPI.getRooms({ limit: 1000 })
+      const response = await roomsAPI.getRooms()
       setRooms(response.data.rooms || [])
     } catch (error) {
       console.error('Error fetching rooms:', error)

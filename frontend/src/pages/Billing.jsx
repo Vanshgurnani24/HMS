@@ -56,8 +56,8 @@ const Billing = () => {
     try {
       setLoading(true)
       const [paymentsRes, bookingsRes] = await Promise.all([
-        paymentsAPI.getPayments({ limit: 1000 }),
-        bookingsAPI.getBookings({ limit: 1000 }),
+        paymentsAPI.getPayments(),
+        bookingsAPI.getBookings(),
       ])
       
       const paymentsData = paymentsRes.data.payments || []
