@@ -109,9 +109,20 @@ const Billing = () => {
 
   const handleSubmit = async () => {
     try {
+      // Find the selected booking to get its amount
+      const selectedBooking = bookings.find(b => b.id === parseInt(formData.booking_id))
+      
+      if (!selectedBooking) {
+        setError('Selected booking not found')
+        return
+      }
+
       const submitData = {
-        ...formData,
         booking_id: parseInt(formData.booking_id),
+        amount: selectedBooking.final_amount, // ← CRITICAL FIX: Include amount from booking
+        payment_method: formData.payment_method,
+        reference_number: formData.reference_number || null,
+        notes: formData.notes || null,
       }
 
       await paymentsAPI.createPayment(submitData)
@@ -172,52 +183,43 @@ const Billing = () => {
         </Box>
       </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} md={4}>
-          <Card sx={{ backgroundColor: '#e8f5e9' }}>
+          <Card>
             <CardContent>
-              <Typography variant="body2" color="text.secondary">
+              <Typography color="textSecondary" gutterBottom>
                 Total Revenue
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: '#2e7d32' }}>
-                ₹{stats.totalRevenue.toLocaleString()}
-              </Typography>
-              <Typography variant="caption">
-                {stats.completedPayments} completed payments
+              <Typography variant="h4">
+                ₹{stats.totalRevenue.toFixed(2)}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Card sx={{ backgroundColor: '#fff3e0' }}>
+          <Card>
             <CardContent>
-              <Typography variant="body2" color="text.secondary">
+              <Typography color="textSecondary" gutterBottom>
+                Completed Payments
+              </Typography>
+              <Typography variant="h4">
+                {stats.completedPayments}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
                 Pending Payments
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: '#ed6c02' }}>
+              <Typography variant="h4">
                 {stats.pendingPayments}
-              </Typography>
-              <Typography variant="caption">
-                Awaiting confirmation
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ backgroundColor: '#e3f2fd' }}>
-            <CardContent>
-              <Typography variant="body2" color="text.secondary">
-                Unpaid Bookings
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: '#1976d2' }}>
-                {unpaidBookings.length}
-              </Typography>
-              <Typography variant="caption">
-                Need payment processing
               </Typography>
             </CardContent>
           </Card>

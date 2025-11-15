@@ -21,7 +21,15 @@ import {
   Alert,
   Autocomplete,
 } from '@mui/material'
-import { Add, Refresh, CheckCircle, Cancel, Login, Logout } from '@mui/icons-material'
+import { 
+  Add, 
+  Refresh, 
+  CheckCircle, 
+  Cancel, 
+  Login, 
+  Logout,
+  HowToReg,
+} from '@mui/icons-material'
 import { bookingsAPI, roomsAPI, customersAPI } from '../api/axios'
 import { BOOKING_STATUS_LABELS, STATUS_COLORS } from '../utils/constants'
 import LoadingSpinner from '../components/common/LoadingSpinner'
@@ -40,6 +48,7 @@ const Bookings = () => {
     check_in_date: '',
     check_out_date: '',
     number_of_guests: '',
+    status: 'pending', // Default status
     special_requests: '',
   })
 
@@ -73,6 +82,7 @@ const Bookings = () => {
       check_in_date: '',
       check_out_date: '',
       number_of_guests: '',
+      status: 'pending', // Default to pending
       special_requests: '',
     })
     setOpenDialog(true)
@@ -94,19 +104,39 @@ const Bookings = () => {
   const handleSubmit = async () => {
     try {
       const submitData = {
-        ...formData,
         customer_id: formData.customer_id?.id || formData.customer_id,
         room_id: formData.room_id?.id || formData.room_id,
+        check_in_date: formData.check_in_date,
+        check_out_date: formData.check_out_date,
         number_of_guests: parseInt(formData.number_of_guests),
+        special_requests: formData.special_requests,
       }
 
-      await bookingsAPI.createBooking(submitData)
+      // Create the booking first
+      const response = await bookingsAPI.createBooking(submitData)
+      
+      // If status is not pending, update it
+      if (formData.status !== 'pending') {
+        await bookingsAPI.updateBookingStatus(response.data.id, formData.status)
+      }
+      
       setSuccess('Booking created successfully!')
       handleCloseDialog()
       fetchData()
     } catch (error) {
       console.error('Error creating booking:', error)
       setError(error.response?.data?.detail || 'Failed to create booking')
+    }
+  }
+
+  const handleConfirm = async (id) => {
+    try {
+      await bookingsAPI.updateBookingStatus(id, 'confirmed')
+      setSuccess('Booking confirmed successfully!')
+      fetchData()
+    } catch (error) {
+      console.error('Error confirming booking:', error)
+      setError(error.response?.data?.detail || 'Failed to confirm booking')
     }
   }
 
@@ -145,6 +175,70 @@ const Bookings = () => {
     }
   }
 
+  // Render action buttons based on booking status
+  const renderActionButtons = (booking) => {
+    const { id, status } = booking
+
+    return (
+      <Box sx={{ display: 'flex', gap: 0.5 }}>
+        {/* Confirm button - only for pending bookings */}
+        {status === 'pending' && (
+          <IconButton
+            size="small"
+            color="info"
+            onClick={() => handleConfirm(id)}
+            title="Confirm Booking"
+          >
+            <HowToReg />
+          </IconButton>
+        )}
+
+        {/* Check-in button - for pending and confirmed bookings */}
+        {(status === 'pending' || status === 'confirmed') && (
+          <IconButton
+            size="small"
+            color="success"
+            onClick={() => handleCheckIn(id)}
+            title="Check In"
+          >
+            <Login />
+          </IconButton>
+        )}
+
+        {/* Check-out button - for pending, confirmed, and checked_in bookings */}
+        {(status === 'pending' || status === 'confirmed' || status === 'checked_in') && (
+          <IconButton
+            size="small"
+            color="primary"
+            onClick={() => handleCheckOut(id)}
+            title="Check Out"
+          >
+            <Logout />
+          </IconButton>
+        )}
+
+        {/* Cancel button - for pending, confirmed, and checked_in bookings */}
+        {(status === 'pending' || status === 'confirmed' || status === 'checked_in') && (
+          <IconButton
+            size="small"
+            color="error"
+            onClick={() => handleCancel(id)}
+            title="Cancel"
+          >
+            <Cancel />
+          </IconButton>
+        )}
+
+        {/* No actions for cancelled or checked_out bookings */}
+        {(status === 'cancelled' || status === 'checked_out') && (
+          <Typography variant="caption" color="text.secondary">
+            -
+          </Typography>
+        )}
+      </Box>
+    )
+  }
+
   if (loading) {
     return <LoadingSpinner />
   }
@@ -174,8 +268,8 @@ const Bookings = () => {
         </Box>
       </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
       <TableContainer component={Paper}>
         <Table>
@@ -223,36 +317,7 @@ const Bookings = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    {booking.status === 'confirmed' && (
-                      <IconButton
-                        size="small"
-                        color="success"
-                        onClick={() => handleCheckIn(booking.id)}
-                        title="Check In"
-                      >
-                        <Login />
-                      </IconButton>
-                    )}
-                    {booking.status === 'checked_in' && (
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => handleCheckOut(booking.id)}
-                        title="Check Out"
-                      >
-                        <Logout />
-                      </IconButton>
-                    )}
-                    {(booking.status === 'pending' || booking.status === 'confirmed') && (
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => handleCancel(booking.id)}
-                        title="Cancel"
-                      >
-                        <Cancel />
-                      </IconButton>
-                    )}
+                    {renderActionButtons(booking)}
                   </TableCell>
                 </TableRow>
               ))
@@ -317,6 +382,24 @@ const Bookings = () => {
               required
               fullWidth
             />
+            
+            {/* NEW: Booking Status Selection */}
+            <TextField
+              select
+              label="Booking Status"
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              required
+              fullWidth
+              helperText="Select the initial booking status"
+            >
+              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem value="confirmed">Confirmed</MenuItem>
+              <MenuItem value="checked_in">Checked In</MenuItem>
+              <MenuItem value="checked_out">Checked Out</MenuItem>
+            </TextField>
+
             <TextField
               label="Special Requests"
               name="special_requests"
