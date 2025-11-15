@@ -21,7 +21,7 @@ import {
   Alert,
   Autocomplete,
 } from '@mui/material'
-import { Add, Refresh, CheckCircle, Cancel } from '@mui/icons-material'
+import { Add, Refresh, CheckCircle, Cancel, Login, Logout } from '@mui/icons-material'
 import { bookingsAPI, roomsAPI, customersAPI } from '../api/axios'
 import { BOOKING_STATUS_LABELS, STATUS_COLORS } from '../utils/constants'
 import LoadingSpinner from '../components/common/LoadingSpinner'
@@ -230,7 +230,7 @@ const Bookings = () => {
                         onClick={() => handleCheckIn(booking.id)}
                         title="Check In"
                       >
-                        <CheckCircle />
+                        <Login />
                       </IconButton>
                     )}
                     {booking.status === 'checked_in' && (
@@ -240,7 +240,7 @@ const Bookings = () => {
                         onClick={() => handleCheckOut(booking.id)}
                         title="Check Out"
                       >
-                        <CheckCircle />
+                        <Logout />
                       </IconButton>
                     )}
                     {(booking.status === 'pending' || booking.status === 'confirmed') && (
