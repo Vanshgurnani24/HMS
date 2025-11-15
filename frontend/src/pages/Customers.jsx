@@ -17,9 +17,8 @@ import {
   TextField,
   IconButton,
   Alert,
-  InputAdornment,
 } from '@mui/material'
-import { Add, Edit, Delete, Refresh, Search } from '@mui/icons-material'
+import { Add, Refresh, Edit, Delete, Upload, AttachFile } from '@mui/icons-material'
 import { customersAPI } from '../api/axios'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 
@@ -30,7 +29,8 @@ const Customers = () => {
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [fileName, setFileName] = useState('')
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -63,32 +63,14 @@ const Customers = () => {
     }
   }
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      fetchCustomers()
-      return
-    }
-
-    try {
-      setLoading(true)
-      const response = await customersAPI.searchCustomers(searchQuery)
-      setCustomers(response.data.customers || [])
-    } catch (error) {
-      console.error('Error searching customers:', error)
-      setError('Search failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleOpenDialog = (customer = null) => {
     if (customer) {
       setSelectedCustomer(customer)
       setFormData({
-        first_name: customer.first_name,
-        last_name: customer.last_name,
-        email: customer.email,
-        phone: customer.phone,
+        first_name: customer.first_name || '',
+        last_name: customer.last_name || '',
+        email: customer.email || '',
+        phone: customer.phone || '',
         address: customer.address || '',
         city: customer.city || '',
         state: customer.state || '',
@@ -115,6 +97,8 @@ const Customers = () => {
         date_of_birth: '',
       })
     }
+    setSelectedFile(null)
+    setFileName('')
     setOpenDialog(true)
     setError('')
     setSuccess('')
@@ -123,6 +107,8 @@ const Customers = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false)
     setSelectedCustomer(null)
+    setSelectedFile(null)
+    setFileName('')
   }
 
   const handleChange = (e) => {
@@ -132,13 +118,46 @@ const Customers = () => {
     })
   }
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
+      if (!allowedTypes.includes(file.type)) {
+        setError('Invalid file type. Please upload JPG, PNG, or PDF only.')
+        return
+      }
+      
+      // Validate file size (5MB max)
+      const maxSize = 5 * 1024 * 1024 // 5MB in bytes
+      if (file.size > maxSize) {
+        setError('File size must be less than 5MB')
+        return
+      }
+      
+      setSelectedFile(file)
+      setFileName(file.name)
+      setError('')
+    }
+  }
+
   const handleSubmit = async () => {
     try {
+      // Prepare form data with file upload
+      const submitData = {
+        ...formData,
+      }
+
+      // Add file if selected
+      if (selectedFile) {
+        submitData.id_proof = selectedFile
+      }
+
       if (selectedCustomer) {
-        await customersAPI.updateCustomer(selectedCustomer.id, formData)
+        await customersAPI.updateCustomer(selectedCustomer.id, submitData)
         setSuccess('Customer updated successfully!')
       } else {
-        await customersAPI.createCustomer(formData)
+        await customersAPI.createCustomer(submitData)
         setSuccess('Customer created successfully!')
       }
 
@@ -192,28 +211,8 @@ const Customers = () => {
         </Box>
       </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
-
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <TextField
-          fullWidth
-          placeholder="Search by name, email, or phone"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-            endAdornment: (
-              <Button onClick={handleSearch}>Search</Button>
-            ),
-          }}
-        />
-      </Paper>
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
 
       <TableContainer component={Paper}>
         <Table>
@@ -349,7 +348,7 @@ const Customers = () => {
               value={formData.id_type}
               onChange={handleChange}
               fullWidth
-              placeholder="e.g., Passport, Aadhaar"
+              placeholder="e.g., Passport, Aadhaar, Driver's License"
             />
             <TextField
               label="ID Number"
@@ -367,6 +366,38 @@ const Customers = () => {
               fullWidth
               InputLabelProps={{ shrink: true }}
             />
+            
+            {/* NEW: ID Proof File Upload */}
+            <Box sx={{ gridColumn: '1 / -1', mt: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                ID Proof Document (Optional)
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                Upload JPG, PNG, or PDF (Max 5MB)
+              </Typography>
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<Upload />}
+                sx={{ mt: 1 }}
+              >
+                Upload ID Proof
+                <input
+                  type="file"
+                  hidden
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  onChange={handleFileChange}
+                />
+              </Button>
+              {fileName && (
+                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 1 }}>
+                  <AttachFile fontSize="small" color="primary" />
+                  <Typography variant="body2" color="primary">
+                    {fileName}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>

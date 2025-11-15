@@ -33,6 +33,7 @@ import {
 import { bookingsAPI, roomsAPI, customersAPI } from '../api/axios'
 import { BOOKING_STATUS_LABELS, STATUS_COLORS } from '../utils/constants'
 import LoadingSpinner from '../components/common/LoadingSpinner'
+import { formatDate } from '../utils/dateUtils'
 
 const Bookings = () => {
   const [bookings, setBookings] = useState([])
@@ -305,8 +306,8 @@ const Bookings = () => {
                       'N/A'}
                   </TableCell>
                   <TableCell>{booking.room?.room_number || 'N/A'}</TableCell>
-                  <TableCell>{new Date(booking.check_in_date).toLocaleDateString()}</TableCell>
-                  <TableCell>{new Date(booking.check_out_date).toLocaleDateString()}</TableCell>
+                  <TableCell>{formatDate(booking.check_in_date)}</TableCell>
+                  <TableCell>{formatDate(booking.check_out_date)}</TableCell>
                   <TableCell>{booking.number_of_nights}</TableCell>
                   <TableCell>₹{booking.final_amount}</TableCell>
                   <TableCell>

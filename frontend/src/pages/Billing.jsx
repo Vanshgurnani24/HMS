@@ -27,6 +27,7 @@ import { Add, Refresh, Receipt, CheckCircle } from '@mui/icons-material'
 import { paymentsAPI, bookingsAPI } from '../api/axios'
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, STATUS_COLORS, PAYMENT_METHODS } from '../utils/constants'
 import LoadingSpinner from '../components/common/LoadingSpinner'
+import { formatDate } from '../utils/dateUtils'
 
 const Billing = () => {
   const [payments, setPayments] = useState([])
@@ -270,7 +271,7 @@ const Billing = () => {
                   </TableCell>
                   <TableCell>
                     {payment.payment_date ? 
-                      new Date(payment.payment_date).toLocaleDateString() : 
+                      formatDate(payment.payment_date) : 
                       'Pending'}
                   </TableCell>
                   <TableCell>
