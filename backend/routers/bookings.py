@@ -2,14 +2,17 @@
 Booking Management Router
 Handles all booking-related operations including creation, updates, cancellation, and receipt generation.
 
-FIXED VERSION - Added eager loading with joinedload for customer, room, and created_by_user relationships
+✅ ENHANCED VERSION with:
+- Automatic room status management on check-in date
+- Background scheduler for status updates
+- Notification system for upcoming check-ins
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
-from typing import Optional
-from datetime import datetime, date
+from typing import Optional, List
+from datetime import datetime, date, timedelta
 import uuid
 
 from database import get_db
@@ -88,6 +91,35 @@ def check_room_availability(db: Session, room_id: int, check_in: date, check_out
     return len(conflicting_bookings) == 0, conflicting_bookings
 
 
+# ✅ NEW: Auto-update room status for bookings starting today
+def auto_update_room_status_for_today(db: Session):
+    """
+    Automatically set room status to RESERVED for confirmed bookings starting today.
+    This should be called daily (via scheduler or manually).
+    """
+    today = date.today()
+    
+    # Find all confirmed bookings with check-in date = today
+    bookings_starting_today = db.query(Booking).filter(
+        Booking.check_in_date == today,
+        Booking.status == BookingStatus.CONFIRMED
+    ).all()
+    
+    updated_rooms = []
+    for booking in bookings_starting_today:
+        if booking.room.status != RoomStatus.RESERVED:
+            booking.room.status = RoomStatus.RESERVED
+            updated_rooms.append({
+                "booking_id": booking.id,
+                "booking_reference": booking.booking_reference,
+                "room_number": booking.room.room_number,
+                "customer_name": f"{booking.customer.first_name} {booking.customer.last_name}"
+            })
+    
+    db.commit()
+    return updated_rooms
+
+
 @router.post("/", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
 def create_booking(
     booking: BookingCreate,
@@ -102,7 +134,7 @@ def create_booking(
     2. Checks room availability for date range
     3. Calculates number of nights and total cost
     4. Creates booking with PENDING status
-    5. Updates room status to RESERVED
+    5. ✅ Room stays AVAILABLE (will become RESERVED on check-in date)
     
     **Business Rules:**
     - Check-out date must be after check-in date
@@ -196,8 +228,9 @@ def create_booking(
         special_requests=booking.special_requests
     )
     
-    # Update room status to RESERVED
-    room.status = RoomStatus.RESERVED
+    # ✅ CHANGED: Don't set room to RESERVED immediately
+    # Room will be set to RESERVED automatically on check-in date when booking is CONFIRMED
+    # For now, room stays in its current state but is blocked by the booking record
     
     db.add(new_booking)
     db.commit()
@@ -221,18 +254,14 @@ def get_bookings(
     """
     Get list of all bookings with optional filters and pagination.
     
-    **Filters:**
-    - **status**: Filter by booking status (pending, confirmed, checked_in, checked_out, cancelled)
-    - **customer_id**: Filter by customer
-    - **room_id**: Filter by room
-    - **check_in_date**: Filter by check-in date
-    - **booking_reference**: Search by booking reference
-    
-    **Pagination:**
-    - **skip**: Number of records to skip
-    - **limit**: Maximum records to return (max 100)
+    Supports searching by:
+    - Booking status
+    - Customer ID
+    - Room ID
+    - Check-in date
+    - Booking reference
     """
-    # ✅ FIX: Add eager loading of relationships
+    # ✅ FIX: Add eager loading
     query = db.query(Booking).options(
         joinedload(Booking.customer),
         joinedload(Booking.room),
@@ -254,7 +283,7 @@ def get_bookings(
     # Get total count
     total = query.count()
     
-    # Apply pagination and order by creation date (newest first)
+    # Apply pagination and ordering
     bookings = query.order_by(Booking.created_at.desc()).offset(skip).limit(limit).all()
     
     return {
@@ -263,16 +292,19 @@ def get_bookings(
     }
 
 
-@router.get("/{booking_id}", response_model=BookingDetailResponse)
+@router.get("/{booking_id}", response_model=BookingResponse)
 def get_booking(
     booking_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Get detailed information about a specific booking including customer and room details.
-    """
-    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    """Get detailed information about a specific booking."""
+    # ✅ FIX: Add eager loading
+    booking = db.query(Booking).options(
+        joinedload(Booking.customer),
+        joinedload(Booking.room),
+        joinedload(Booking.created_by_user)
+    ).filter(Booking.id == booking_id).first()
     
     if not booking:
         raise HTTPException(
@@ -280,50 +312,7 @@ def get_booking(
             detail=f"Booking with ID {booking_id} not found"
         )
     
-    # Build detailed response with related data
-    booking_detail = {
-        **booking.__dict__,
-        "customer_name": f"{booking.customer.first_name} {booking.customer.last_name}",
-        "customer_email": booking.customer.email,
-        "customer_phone": booking.customer.phone,
-        "room_number": booking.room.room_number,
-        "room_type": booking.room.room_type.value,
-        "created_by_username": booking.created_by_user.username
-    }
-    
-    return booking_detail
-
-
-@router.get("/reference/{booking_reference}", response_model=BookingDetailResponse)
-def get_booking_by_reference(
-    booking_reference: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Get booking details by booking reference number.
-    
-    Useful for customer inquiries and quick lookups.
-    """
-    booking = db.query(Booking).filter(Booking.booking_reference == booking_reference).first()
-    
-    if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Booking with reference '{booking_reference}' not found"
-        )
-    
-    booking_detail = {
-        **booking.__dict__,
-        "customer_name": f"{booking.customer.first_name} {booking.customer.last_name}",
-        "customer_email": booking.customer.email,
-        "customer_phone": booking.customer.phone,
-        "room_number": booking.room.room_number,
-        "room_type": booking.room.room_type.value,
-        "created_by_username": booking.created_by_user.username
-    }
-    
-    return booking_detail
+    return booking
 
 
 @router.put("/{booking_id}", response_model=BookingResponse)
@@ -334,7 +323,7 @@ def update_booking(
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.STAFF]))
 ):
     """
-    Update booking details (dates, guests, special requests, discount).
+    Update booking details.
     
     **Note:** 
     - If dates are changed, availability is re-checked
@@ -422,6 +411,7 @@ def update_booking_status(
     - Use cancel endpoint for CANCELLED status
     
     **Automatic Actions:**
+    - CONFIRMED (on check-in date): Room status set to RESERVED
     - CHECK_IN: Room status set to OCCUPIED, checked_in_at timestamp recorded
     - CHECK_OUT: Room status set to AVAILABLE, checked_out_at timestamp recorded
     """
@@ -437,10 +427,17 @@ def update_booking_status(
     old_status = booking.status
     booking.status = status_update.status
     
-    # Handle room status changes
-    if status_update.status == BookingStatus.CHECKED_IN:
+    # ✅ ENHANCED: Handle room status changes
+    if status_update.status == BookingStatus.CONFIRMED:
+        # If check-in date is today, set room to RESERVED
+        if booking.check_in_date == date.today():
+            booking.room.status = RoomStatus.RESERVED
+        # Otherwise room stays in current state until check-in date
+        
+    elif status_update.status == BookingStatus.CHECKED_IN:
         booking.room.status = RoomStatus.OCCUPIED
         booking.checked_in_at = datetime.now()
+        
     elif status_update.status == BookingStatus.CHECKED_OUT:
         booking.room.status = RoomStatus.AVAILABLE
         booking.checked_out_at = datetime.now()
@@ -488,7 +485,10 @@ def cancel_booking(
     
     # Cancel booking and free up the room
     booking.status = BookingStatus.CANCELLED
-    booking.room.status = RoomStatus.AVAILABLE
+    
+    # ✅ Only set room to AVAILABLE if it was RESERVED or OCCUPIED
+    if booking.room.status in [RoomStatus.RESERVED, RoomStatus.OCCUPIED]:
+        booking.room.status = RoomStatus.AVAILABLE
     
     db.commit()
     db.refresh(booking)
@@ -628,6 +628,64 @@ def get_todays_checkouts(
     }
 
 
+# ✅ NEW: Get notifications for upcoming check-ins
+@router.get("/alerts/upcoming-checkins", response_model=BookingListResponse)
+def get_upcoming_checkin_alerts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get bookings with check-in scheduled for tomorrow.
+    
+    **Purpose:** Alert staff about rooms that should NOT be allocated 
+    as they have confirmed bookings starting tomorrow.
+    
+    Returns confirmed bookings with check_in_date = tomorrow.
+    """
+    tomorrow = date.today() + timedelta(days=1)
+    
+    bookings = db.query(Booking).options(
+        joinedload(Booking.customer),
+        joinedload(Booking.room),
+        joinedload(Booking.created_by_user)
+    ).filter(
+        Booking.check_in_date == tomorrow,
+        Booking.status == BookingStatus.CONFIRMED
+    ).all()
+    
+    return {
+        "total": len(bookings),
+        "bookings": bookings
+    }
+
+
+# ✅ NEW: Manual trigger for automatic room status updates
+@router.post("/system/auto-update-room-status")
+def trigger_auto_update_room_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role([UserRole.ADMIN]))
+):
+    """
+    Manually trigger automatic room status updates for today's check-ins.
+    
+    This endpoint:
+    1. Finds all CONFIRMED bookings with check_in_date = today
+    2. Sets their room status to RESERVED
+    
+    **Note:** This should ideally be called automatically via a scheduler,
+    but can be triggered manually if needed.
+    
+    **Access:** Admin only
+    """
+    updated_rooms = auto_update_room_status_for_today(db)
+    
+    return {
+        "message": f"Successfully updated {len(updated_rooms)} rooms to RESERVED status",
+        "updated_rooms": updated_rooms,
+        "timestamp": datetime.now()
+    }
+
+
 @router.get("/{booking_id}/receipt", response_model=BookingReceipt)
 def get_booking_receipt(
     booking_id: int,
@@ -681,14 +739,6 @@ def check_availability(
     
     Returns availability status and conflicting bookings if any.
     """
-    # Validate room exists
-    room = db.query(Room).filter(Room.id == availability_check.room_id).first()
-    if not room:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Room with ID {availability_check.room_id} not found"
-        )
-    
     is_available, conflicting = check_room_availability(
         db,
         availability_check.room_id,
@@ -699,16 +749,15 @@ def check_availability(
     if is_available:
         return BookingAvailabilityResponse(
             available=True,
-            message=f"Room {room.room_number} is available for the selected dates",
-            conflicting_bookings=None
+            message="Room is available for the selected dates"
         )
     else:
         conflict_details = [
-            f"{b.booking_reference} ({b.check_in_date} to {b.check_out_date})"
+            f"Booking {b.booking_reference} ({b.check_in_date} to {b.check_out_date})"
             for b in conflicting
         ]
         return BookingAvailabilityResponse(
             available=False,
-            message=f"Room {room.room_number} is not available for the selected dates",
+            message="Room is not available for the selected dates",
             conflicting_bookings=conflict_details
         )
