@@ -1,12 +1,56 @@
 """
 Payment and Billing Pydantic schemas for request/response validation.
 Handles payment processing, invoice generation, and billing data.
+
+FIXED VERSION - Added nested booking object with customer and room to PaymentResponse
 """
 
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime, date
 from models.payment import PaymentMethod, PaymentStatus
+
+
+# Nested objects for payment response
+class CustomerNestedInPayment(BaseModel):
+    """Nested customer data"""
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+    phone: str
+    
+    class Config:
+        from_attributes = True
+
+
+class RoomNestedInPayment(BaseModel):
+    """Nested room data"""
+    id: int
+    room_number: str
+    room_type: str
+    
+    class Config:
+        from_attributes = True
+
+
+class BookingNestedInPayment(BaseModel):
+    """Nested booking data in payment response"""
+    id: int
+    booking_reference: str
+    customer_id: int
+    room_id: int
+    check_in_date: date
+    check_out_date: date
+    final_amount: float
+    status: str
+    
+    # Nested customer and room in booking
+    customer: Optional[CustomerNestedInPayment] = None
+    room: Optional[RoomNestedInPayment] = None
+    
+    class Config:
+        from_attributes = True
 
 
 # Payment Schemas
@@ -40,6 +84,9 @@ class PaymentResponse(PaymentBase):
     created_at: datetime
     updated_at: datetime
     
+    # ✅ FIX: Add nested booking object
+    booking: Optional[BookingNestedInPayment] = None
+    
     class Config:
         from_attributes = True
 
@@ -64,6 +111,7 @@ class InvoiceResponse(BaseModel):
     # Invoice Details
     invoice_no: str
     invoice_date: datetime
+    booking_id: int
     
     # Booking Details
     booking_reference: str
@@ -90,42 +138,35 @@ class InvoiceResponse(BaseModel):
     tax: float
     total_amount: float
     
-    # Payment Details
-    payment_status: PaymentStatus
-    payment_method: Optional[str] = None
+    # Payment Info
+    payment_status: str
+    payment_method: str
     payment_date: Optional[datetime] = None
-    transaction_id: Optional[str] = None
-    
-    # Additional Info
-    special_requests: Optional[str] = None
-    notes: Optional[str] = None
+    created_at: datetime
 
 
 class PaymentSummary(BaseModel):
-    """Schema for payment summary statistics"""
-    total_payments: int
+    """Payment summary for a booking"""
+    booking_id: int
+    booking_reference: str
     total_amount: float
-    completed_payments: int
-    completed_amount: float
-    pending_payments: int
-    pending_amount: float
-    failed_payments: int
-    failed_amount: float
-    payment_methods: dict  # {"cash": count, "card": count, ...}
+    total_paid: float
+    total_pending: float
+    total_refunded: float
+    balance_due: float
+    payment_count: int
 
 
 class RefundRequest(BaseModel):
-    """Schema for refund request"""
-    payment_id: int
-    refund_amount: float = Field(..., gt=0)
-    reason: str
-    
-    
+    """Request to refund a payment"""
+    reason: str = Field(..., min_length=10, description="Reason for refund")
+
+
 class RefundResponse(BaseModel):
-    """Schema for refund response"""
+    """Response for refund operation"""
     payment_id: int
-    original_amount: float
+    transaction_id: str
     refund_amount: float
-    refund_status: PaymentStatus
+    refund_status: str
     refund_date: datetime
-    reason: str
+    message: str

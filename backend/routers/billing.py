@@ -1,10 +1,12 @@
 """
 Billing and Payment Management Router
 Handles payment processing, invoice generation, and billing operations.
+
+FIXED VERSION - Added eager loading with joinedload for booking, customer, and room relationships
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import Optional
 from datetime import datetime
@@ -149,7 +151,11 @@ def get_payments(
     - **skip**: Number of records to skip
     - **limit**: Maximum records to return (max 100)
     """
-    query = db.query(Payment)
+    # ✅ FIX: Add eager loading of relationships
+    query = db.query(Payment).options(
+        joinedload(Payment.booking).joinedload(Booking.customer),
+        joinedload(Payment.booking).joinedload(Booking.room)
+    )
     
     # Apply filters
     if payment_status:

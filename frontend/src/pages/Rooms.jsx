@@ -35,6 +35,7 @@ const Rooms = () => {
   const [formData, setFormData] = useState({
     room_number: '',
     room_type: ROOM_TYPES.SINGLE,
+    status: ROOM_STATUS.AVAILABLE, // Added status field
     price_per_night: '',
     floor: '',
     capacity: '',
@@ -65,6 +66,7 @@ const Rooms = () => {
       setFormData({
         room_number: room.room_number,
         room_type: room.room_type,
+        status: room.status, // Include status when editing
         price_per_night: room.price_per_night,
         floor: room.floor,
         capacity: room.capacity,
@@ -76,6 +78,7 @@ const Rooms = () => {
       setFormData({
         room_number: '',
         room_type: ROOM_TYPES.SINGLE,
+        status: ROOM_STATUS.AVAILABLE, // Default status for new rooms
         price_per_night: '',
         floor: '',
         capacity: '',
@@ -260,6 +263,31 @@ const Rooms = () => {
                 </MenuItem>
               ))}
             </TextField>
+            
+            {/* NEW: Status Dropdown */}
+            <TextField
+              select
+              label="Room Status"
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              required
+              fullWidth
+              helperText="Select the current status of the room"
+            >
+              {Object.entries(ROOM_STATUS_LABELS).map(([value, label]) => (
+                <MenuItem key={value} value={value}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Chip
+                      label={label}
+                      color={STATUS_COLORS[value]}
+                      size="small"
+                    />
+                  </Box>
+                </MenuItem>
+              ))}
+            </TextField>
+            
             <TextField
               label="Price per Night"
               name="price_per_night"

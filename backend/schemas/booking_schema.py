@@ -1,12 +1,38 @@
 """
 Booking Pydantic schemas for request/response validation.
 Handles booking data validation, creation, updates, and responses.
+
+FIXED VERSION - Added nested customer and room objects to BookingResponse
 """
 
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime, date
 from models.booking import BookingStatus
+
+
+# Forward references for nested objects
+class CustomerNested(BaseModel):
+    """Nested customer data in booking response"""
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+    phone: str
+    
+    class Config:
+        from_attributes = True
+
+
+class RoomNested(BaseModel):
+    """Nested room data in booking response"""
+    id: int
+    room_number: str
+    room_type: str
+    floor: int
+    
+    class Config:
+        from_attributes = True
 
 
 # Booking Schemas
@@ -58,7 +84,7 @@ class BookingStatusUpdate(BaseModel):
 
 
 class BookingResponse(BookingBase):
-    """Schema for booking response (includes all fields)"""
+    """Schema for booking response (includes all fields + nested objects)"""
     id: int
     booking_reference: str
     created_by: int
@@ -73,6 +99,10 @@ class BookingResponse(BookingBase):
     updated_at: datetime
     checked_in_at: Optional[datetime] = None
     checked_out_at: Optional[datetime] = None
+    
+    # ✅ FIX: Add nested objects
+    customer: Optional[CustomerNested] = None
+    room: Optional[RoomNested] = None
     
     class Config:
         from_attributes = True
