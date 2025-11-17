@@ -17,6 +17,8 @@ import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
 
 const UpcomingCheckinNotifications = () => {
+  console.log('🔔 UpcomingCheckinNotifications: Component rendering...')
+  
   const [anchorEl, setAnchorEl] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
@@ -24,36 +26,53 @@ const UpcomingCheckinNotifications = () => {
 
   // Fetch upcoming check-ins
   const fetchUpcomingCheckins = async () => {
+    console.log('🔍 fetchUpcomingCheckins: Starting API call...')
     setLoading(true)
     try {
+      console.log('📡 Making request to: /bookings/alerts/upcoming-checkins')
       const response = await api.get('/bookings/alerts/upcoming-checkins')
+      console.log('✅ Response received:', response.data)
+      console.log('📊 Total notifications:', response.data.bookings?.length || 0)
       setNotifications(response.data.bookings || [])
     } catch (error) {
-      console.error('Error fetching upcoming check-ins:', error)
+      console.error('❌ Error fetching upcoming check-ins:', error)
+      console.error('❌ Error details:', error.response?.data)
+      console.error('❌ Error status:', error.response?.status)
     } finally {
       setLoading(false)
+      console.log('🏁 fetchUpcomingCheckins: Completed')
     }
   }
 
   // Fetch on component mount and every hour
   useEffect(() => {
+    console.log('🔄 useEffect: Running...')
     fetchUpcomingCheckins()
     
     // Refresh every hour (3600000 ms)
-    const interval = setInterval(fetchUpcomingCheckins, 3600000)
+    const interval = setInterval(() => {
+      console.log('⏰ Auto-refresh: Fetching notifications...')
+      fetchUpcomingCheckins()
+    }, 3600000)
     
-    return () => clearInterval(interval)
+    return () => {
+      console.log('🧹 useEffect: Cleanup - clearing interval')
+      clearInterval(interval)
+    }
   }, [])
 
   const handleClick = (event) => {
+    console.log('🖱️ Bell clicked')
     setAnchorEl(event.currentTarget)
   }
 
   const handleClose = () => {
+    console.log('❌ Popover closed')
     setAnchorEl(null)
   }
 
   const handleViewBooking = (bookingId) => {
+    console.log('👁️ Viewing booking:', bookingId)
     navigate(`/bookings`)
     handleClose()
   }
@@ -61,8 +80,16 @@ const UpcomingCheckinNotifications = () => {
   const open = Boolean(anchorEl)
   const notificationCount = notifications.length
 
+  console.log('📈 Current state:', {
+    notificationCount,
+    loading,
+    open,
+    notificationsLength: notifications.length
+  })
+
   return (
     <>
+      {console.log('🎨 Rendering JSX...')}
       {/* Notification Bell Icon with Badge */}
       <IconButton
         color="inherit"
