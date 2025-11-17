@@ -14,7 +14,7 @@ import {
 } from '@mui/material'
 import { Notifications, Hotel, Warning } from '@mui/icons-material'
 import { useNavigate } from 'react-router-dom'
-import api from '../../utils/api'
+import api from '../../api/axios'
 
 const UpcomingCheckinNotifications = () => {
   console.log('🔔 UpcomingCheckinNotifications: Component rendering...')
@@ -187,7 +187,7 @@ const UpcomingCheckinNotifications = () => {
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
                             <strong>Check-in:</strong>{' '}
-                            {new Date(booking.check_in_date).toLocaleDateString()}
+                            {new Date(booking.check_in_date).toLocaleDateString('en-GB')}
                           </Typography>
                           {booking.special_requests && (
                             <Typography
