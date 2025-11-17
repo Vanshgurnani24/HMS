@@ -3,11 +3,16 @@ import { AccountCircle, Logout, Person } from '@mui/icons-material'
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import UpcomingCheckinNotifications from './UpcomingCheckinNotifications'
 
 const Navbar = () => {
+  console.log('🔵 Navbar: Component rendering...')
+  
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [anchorEl, setAnchorEl] = useState(null)
+
+  console.log('🔵 Navbar: User data:', user)
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget)
@@ -23,6 +28,8 @@ const Navbar = () => {
     handleClose()
   }
 
+  console.log('🔵 Navbar: About to render...')
+
   return (
     <AppBar
       position="sticky"
@@ -33,14 +40,26 @@ const Navbar = () => {
       }}
     >
       <Toolbar>
+        {console.log('🔵 Navbar: Inside Toolbar')}
+        
         <Typography variant="h6" component="div" sx={{ flexGrow: 1, color: '#1976d2' }}>
           Hotel Management System
         </Typography>
+        {console.log('🔵 Navbar: Title rendered')}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {console.log('🔵 Navbar: ⚡ About to render UpcomingCheckinNotifications...')}
+          
+          {/* ==================== NOTIFICATION BELL ==================== */}
+          <UpcomingCheckinNotifications />
+          {/* ========================================================== */}
+          
+          {console.log('🔵 Navbar: ✅ Notification component rendered')}
+
           <Typography variant="body2" sx={{ mr: 1 }}>
             {user?.full_name}
           </Typography>
+          
           <IconButton
             size="large"
             aria-label="account of current user"
@@ -51,6 +70,7 @@ const Navbar = () => {
           >
             <AccountCircle />
           </IconButton>
+          
           <Menu
             id="menu-appbar"
             anchorEl={anchorEl}
@@ -80,5 +100,7 @@ const Navbar = () => {
     </AppBar>
   )
 }
+
+console.log('🔵 Navbar: Component definition complete')
 
 export default Navbar
