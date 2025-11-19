@@ -23,21 +23,41 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
         margin: '0 auto',
         backgroundColor: 'white',
         '@media print': {
-          p: '20mm',
+          p: '15mm',
           margin: 0,
           maxWidth: '210mm',
           width: '210mm',
-          minHeight: '297mm',
+          height: '297mm',
           boxShadow: 'none',
+          overflow: 'hidden',
+          fontSize: '11px',
           '@page': {
             size: 'A4',
             margin: '0',
+          },
+          '& .MuiTypography-h3': {
+            fontSize: '24px !important',
+          },
+          '& .MuiTypography-h5': {
+            fontSize: '16px !important',
+          },
+          '& .MuiTypography-h6': {
+            fontSize: '14px !important',
+          },
+          '& .MuiTypography-body1': {
+            fontSize: '11px !important',
+          },
+          '& .MuiTypography-body2': {
+            fontSize: '10px !important',
+          },
+          '& .MuiDivider-root': {
+            margin: '8px 0 !important',
           },
         },
       }}
     >
       {/* Header */}
-      <Box sx={{ textAlign: 'center', mb: 4 }}>
+      <Box sx={{ textAlign: 'center', mb: { xs: 4, print: 2 } }}>
         <Typography variant="h3" sx={{ fontWeight: 700, color: '#1976d2', mb: 1 }}>
           Ajanta Rooms
         </Typography>
@@ -46,10 +66,10 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
         </Typography>
       </Box>
 
-      <Divider sx={{ mb: 3 }} />
+      <Divider sx={{ mb: { xs: 3, print: 1 } }} />
 
       {/* Invoice Info */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: { xs: 3, print: 1.5 } }}>
         <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
           Payment Receipt
         </Typography>
@@ -81,11 +101,11 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
         </Box>
       </Box>
 
-      <Divider sx={{ mb: 3 }} />
+      <Divider sx={{ mb: { xs: 3, print: 1 } }} />
 
       {/* Customer Details */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+      <Box sx={{ mb: { xs: 3, print: 1.5 } }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: { xs: 2, print: 1 } }}>
           Customer Information
         </Typography>
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
@@ -124,11 +144,11 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
         </Box>
       </Box>
 
-      <Divider sx={{ mb: 3 }} />
+      <Divider sx={{ mb: { xs: 3, print: 1 } }} />
 
       {/* Booking Details */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+      <Box sx={{ mb: { xs: 3, print: 1.5 } }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: { xs: 2, print: 1 } }}>
           Booking Details
         </Typography>
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
@@ -159,28 +179,28 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
         </Box>
       </Box>
 
-      <Divider sx={{ mb: 3 }} />
+      <Divider sx={{ mb: { xs: 3, print: 1 } }} />
 
       {/* Itemized Charges */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+      <Box sx={{ mb: { xs: 3, print: 1.5 } }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: { xs: 2, print: 1 } }}>
           Charges
         </Typography>
         <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
           <Table>
             <TableBody>
               <TableRow>
-                <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600 }}>Quantity</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Unit Price</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Amount</TableCell>
+                <TableCell sx={{ fontWeight: 600, py: { xs: 2, print: 0.5 } }}>Description</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 600, py: { xs: 2, print: 0.5 } }}>Quantity</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600, py: { xs: 2, print: 0.5 } }}>Unit Price</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600, py: { xs: 2, print: 0.5 } }}>Amount</TableCell>
               </TableRow>
               {invoiceData.items?.map((item, index) => (
                 <TableRow key={index}>
-                  <TableCell>{item.description}</TableCell>
-                  <TableCell align="center">{item.quantity}</TableCell>
-                  <TableCell align="right">₹{item.unit_price.toFixed(2)}</TableCell>
-                  <TableCell align="right">₹{item.amount.toFixed(2)}</TableCell>
+                  <TableCell sx={{ py: { xs: 2, print: 0.5 } }}>{item.description}</TableCell>
+                  <TableCell align="center" sx={{ py: { xs: 2, print: 0.5 } }}>{item.quantity}</TableCell>
+                  <TableCell align="right" sx={{ py: { xs: 2, print: 0.5 } }}>₹{item.unit_price.toFixed(2)}</TableCell>
+                  <TableCell align="right" sx={{ py: { xs: 2, print: 0.5 } }}>₹{item.amount.toFixed(2)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -189,7 +209,7 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
       </Box>
 
       {/* Totals */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: { xs: 3, print: 1.5 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
           <Box sx={{ width: '300px' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
@@ -219,11 +239,11 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
         </Box>
       </Box>
 
-      <Divider sx={{ mb: 3 }} />
+      <Divider sx={{ mb: { xs: 3, print: 1 } }} />
 
       {/* Payment Details */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+      <Box sx={{ mb: { xs: 3, print: 1.5 } }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: { xs: 2, print: 1 } }}>
           Payment Information
         </Typography>
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
@@ -264,10 +284,10 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
         </Box>
       </Box>
 
-      <Divider sx={{ mb: 3 }} />
+      <Divider sx={{ mb: { xs: 3, print: 1 } }} />
 
       {/* Footer */}
-      <Box sx={{ textAlign: 'center', mt: 4 }}>
+      <Box sx={{ textAlign: 'center', mt: { xs: 4, print: 2 } }}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           This is a computer-generated receipt and does not require a signature.
         </Typography>
