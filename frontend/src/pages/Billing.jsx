@@ -173,6 +173,18 @@ const Billing = () => {
   const handlePrint = useReactToPrint({
     content: () => receiptRef.current,
     documentTitle: `Receipt-${invoiceData?.invoice_no || 'Invoice'}`,
+    pageStyle: `
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+      }
+    `,
   })
 
   const handleCloseReceipt = () => {

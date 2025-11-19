@@ -23,7 +23,16 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
         margin: '0 auto',
         backgroundColor: 'white',
         '@media print': {
-          p: 2,
+          p: '20mm',
+          margin: 0,
+          maxWidth: '210mm',
+          width: '210mm',
+          minHeight: '297mm',
+          boxShadow: 'none',
+          '@page': {
+            size: 'A4',
+            margin: '0',
+          },
         },
       }}
     >
@@ -31,9 +40,6 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
       <Box sx={{ textAlign: 'center', mb: 4 }}>
         <Typography variant="h3" sx={{ fontWeight: 700, color: '#1976d2', mb: 1 }}>
           Ajanta Rooms
-        </Typography>
-        <Typography variant="subtitle1" color="text.secondary">
-          Hotel Management System
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Thank you for choosing our services

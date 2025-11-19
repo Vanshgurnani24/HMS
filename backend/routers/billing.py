@@ -430,12 +430,14 @@ def get_invoice_by_booking(
     # Create invoice response
     invoice = InvoiceResponse(
         invoice_no=f"INV-{payment.transaction_id}",
+        invoice_date=payment.created_at,
         booking_id=booking.id,
         booking_reference=booking.booking_reference,
         customer_name=f"{booking.customer.first_name} {booking.customer.last_name}",
         customer_email=booking.customer.email,
         customer_phone=booking.customer.phone,
         room_number=booking.room.room_number,
+        room_type=booking.room.room_type.value.title(),
         check_in_date=booking.check_in_date,
         check_out_date=booking.check_out_date,
         number_of_nights=booking.number_of_nights,
