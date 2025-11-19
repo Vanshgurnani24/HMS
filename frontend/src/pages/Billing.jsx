@@ -22,8 +22,9 @@ import {
   Card,
   CardContent,
   Grid,
+  InputAdornment,
 } from '@mui/material'
-import { Add, Refresh, Receipt as ReceiptIcon, CheckCircle, Print } from '@mui/icons-material'
+import { Add, Refresh, Receipt as ReceiptIcon, CheckCircle, Print, Search } from '@mui/icons-material'
 import { paymentsAPI, bookingsAPI } from '../api/axios'
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, STATUS_COLORS, PAYMENT_METHODS } from '../utils/constants'
 import LoadingSpinner from '../components/common/LoadingSpinner'
@@ -54,6 +55,9 @@ const Billing = () => {
   const [invoiceData, setInvoiceData] = useState(null)
   const [receiptLoading, setReceiptLoading] = useState(false)
   const receiptRef = useRef()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   useEffect(() => {
     fetchData()
@@ -197,10 +201,40 @@ const Billing = () => {
   }
 
   // Get bookings that need payment
-  const unpaidBookings = bookings.filter(b => 
+  const unpaidBookings = bookings.filter(b =>
     (b.status === 'confirmed' || b.status === 'checked_in' || b.status === 'checked_out') &&
     !payments.some(p => p.booking_id === b.id && p.payment_status === 'completed')
   )
+
+  // Filter payments based on search query
+  const filteredPayments = payments.filter(payment => {
+    if (!searchQuery) return true
+
+    const query = searchQuery.toLowerCase()
+    const customerName = payment.booking?.customer
+      ? `${payment.booking.customer.first_name} ${payment.booking.customer.last_name}`.toLowerCase()
+      : ''
+    const bookingRef = payment.booking?.booking_reference?.toLowerCase() || ''
+
+    return customerName.includes(query) || bookingRef.includes(query)
+  })
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredPayments.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedPayments = filteredPayments.slice(startIndex, endIndex)
+
+  // Handle page change
+  const handlePageChange = (event) => {
+    setCurrentPage(Number(event.target.value))
+  }
+
+  // Reset to page 1 when search query changes
+  const handleSearchChange = (event) => {
+    setSearchQuery(event.target.value)
+    setCurrentPage(1)
+  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -270,6 +304,45 @@ const Billing = () => {
         </Grid>
       </Grid>
 
+      {/* Search and Pagination Controls */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+        <TextField
+          placeholder="Search by customer name or booking reference..."
+          value={searchQuery}
+          onChange={handleSearchChange}
+          size="small"
+          sx={{ flexGrow: 1, maxWidth: 500 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+          }}
+        />
+        {totalPages > 1 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Page {currentPage} of {totalPages}
+            </Typography>
+            <TextField
+              select
+              size="small"
+              value={currentPage}
+              onChange={handlePageChange}
+              sx={{ minWidth: 80 }}
+              label="Page"
+            >
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <MenuItem key={page} value={page}>
+                  {page}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+        )}
+      </Box>
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -285,16 +358,16 @@ const Billing = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {payments.length === 0 ? (
+            {paginatedPayments.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} align="center">
                   <Typography variant="body2" color="text.secondary">
-                    No payments recorded yet. Record your first payment!
+                    {searchQuery ? 'No payments found matching your search.' : 'No payments recorded yet. Record your first payment!'}
                   </Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              payments.map((payment) => (
+              paginatedPayments.map((payment) => (
                 <TableRow key={payment.id}>
                   <TableCell>{payment.transaction_id}</TableCell>
                   <TableCell>{payment.booking?.booking_reference || 'N/A'}</TableCell>
