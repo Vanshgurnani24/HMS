@@ -256,20 +256,20 @@ const Reports = () => {
 
       {/* Charts */}
       <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
+        <Grid item xs={12} md={4}>
+          <Paper sx={{ p: 3, height: '450px', display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h6" gutterBottom>
-              Room Types Distribution
+              Room Type Distribution
             </Typography>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={chartData.roomTypes}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
+                  labelLine={true}
                   label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
+                  outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
                 >
@@ -283,20 +283,20 @@ const Reports = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
+        <Grid item xs={12} md={4}>
+          <Paper sx={{ p: 3, height: '450px', display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h6" gutterBottom>
               Booking Status Distribution
             </Typography>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={chartData.bookingStatus}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
+                  labelLine={true}
                   label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
+                  outerRadius={100}
                   fill="#82ca9d"
                   dataKey="value"
                 >
@@ -310,18 +310,25 @@ const Reports = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12}>
-          <Paper sx={{ p: 3 }}>
+        <Grid item xs={12} md={4}>
+          <Paper sx={{ p: 3, height: '450px', display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h6" gutterBottom>
               Revenue Trend
             </Typography>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData.revenueByMonth}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 12 }}
+                  interval={0}
+                />
+                <YAxis
+                  tick={{ fontSize: 12 }}
+                  label={{ value: 'Revenue (₹)', angle: -90, position: 'insideLeft' }}
+                />
                 <Tooltip />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: '14px' }} />
                 <Bar dataKey="revenue" fill="#8884d8" name="Revenue (₹)" />
               </BarChart>
             </ResponsiveContainer>
