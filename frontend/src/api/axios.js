@@ -113,6 +113,8 @@ export const paymentsAPI = {
   updatePaymentStatus: (id, status, data) => api.patch(`/payments/${id}/status`, { payment_status: status, ...data }),
   refundPayment: (id) => api.post(`/payments/${id}/refund`),
   getPaymentsByBooking: (bookingId) => api.get(`/payments/booking/${bookingId}`),
+  getInvoiceByPayment: (paymentId) => api.get(`/payments/invoices/payment/${paymentId}`),
+  getInvoiceByBooking: (bookingId) => api.get(`/payments/invoices/booking/${bookingId}`),
 }
 
 export default api

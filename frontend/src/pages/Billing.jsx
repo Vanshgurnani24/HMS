@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Box,
   Button,
@@ -23,11 +23,13 @@ import {
   CardContent,
   Grid,
 } from '@mui/material'
-import { Add, Refresh, Receipt, CheckCircle } from '@mui/icons-material'
+import { Add, Refresh, Receipt as ReceiptIcon, CheckCircle, Print } from '@mui/icons-material'
 import { paymentsAPI, bookingsAPI } from '../api/axios'
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, STATUS_COLORS, PAYMENT_METHODS } from '../utils/constants'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import { formatDate } from '../utils/dateUtils'
+import ReceiptComponent from '../components/common/Receipt'
+import { useReactToPrint } from 'react-to-print'
 
 const Billing = () => {
   const [payments, setPayments] = useState([])
@@ -48,6 +50,10 @@ const Billing = () => {
     reference_number: '',
     notes: '',
   })
+  const [receiptDialog, setReceiptDialog] = useState(false)
+  const [invoiceData, setInvoiceData] = useState(null)
+  const [receiptLoading, setReceiptLoading] = useState(false)
+  const receiptRef = useRef()
 
   useEffect(() => {
     fetchData()
@@ -147,6 +153,31 @@ const Billing = () => {
       console.error('Error completing payment:', error)
       setError(error.response?.data?.detail || 'Failed to complete payment')
     }
+  }
+
+  const handleViewReceipt = async (paymentId) => {
+    try {
+      setReceiptLoading(true)
+      setReceiptDialog(true)
+      const response = await paymentsAPI.getInvoiceByPayment(paymentId)
+      setInvoiceData(response.data)
+    } catch (error) {
+      console.error('Error fetching invoice:', error)
+      setError(error.response?.data?.detail || 'Failed to load receipt')
+      setReceiptDialog(false)
+    } finally {
+      setReceiptLoading(false)
+    }
+  }
+
+  const handlePrint = useReactToPrint({
+    content: () => receiptRef.current,
+    documentTitle: `Receipt-${invoiceData?.invoice_no || 'Invoice'}`,
+  })
+
+  const handleCloseReceipt = () => {
+    setReceiptDialog(false)
+    setInvoiceData(null)
   }
 
   if (loading) {
@@ -290,8 +321,9 @@ const Billing = () => {
                         size="small"
                         color="primary"
                         title="View Receipt"
+                        onClick={() => handleViewReceipt(payment.id)}
                       >
-                        <Receipt />
+                        <ReceiptIcon />
                       </IconButton>
                     )}
                   </TableCell>
@@ -321,7 +353,7 @@ const Billing = () => {
               ) : (
                 unpaidBookings.map((booking) => (
                   <MenuItem key={booking.id} value={booking.id}>
-                    {booking.booking_reference} - {booking.customer?.first_name} {booking.customer?.last_name} 
+                    {booking.booking_reference} - {booking.customer?.first_name} {booking.customer?.last_name}
                     {' '}(₹{booking.final_amount})
                   </MenuItem>
                 ))
@@ -366,6 +398,35 @@ const Billing = () => {
           <Button onClick={handleSubmit} variant="contained" disabled={!formData.booking_id}>
             Record Payment
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Receipt Dialog */}
+      <Dialog open={receiptDialog} onClose={handleCloseReceipt} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">Payment Receipt</Typography>
+            <Button
+              startIcon={<Print />}
+              variant="contained"
+              onClick={handlePrint}
+              disabled={receiptLoading || !invoiceData}
+            >
+              Print Receipt
+            </Button>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {receiptLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <LoadingSpinner />
+            </Box>
+          ) : (
+            <ReceiptComponent ref={receiptRef} invoiceData={invoiceData} />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseReceipt}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
