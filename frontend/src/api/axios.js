@@ -117,4 +117,24 @@ export const paymentsAPI = {
   getInvoiceByBooking: (bookingId) => api.get(`/payments/invoices/booking/${bookingId}`),
 }
 
+export const reportsAPI = {
+  getReport: (reportType, dateRange) => api.get('/reports/', {
+    params: {
+      report_type: reportType,
+      date_range: dateRange
+    }
+  }),
+  getOccupancy: () => api.get('/reports/occupancy'),
+  getDailyRevenue: (date) => api.get('/reports/revenue/daily', { params: { target_date: date } }),
+  getRevenueRange: (startDate, endDate) => api.get('/reports/revenue/range', {
+    params: { start_date: startDate, end_date: endDate }
+  }),
+  getBookingHistory: (params) => api.get('/reports/bookings/history', { params }),
+  getUpcomingBookings: (days = 7) => api.get('/reports/bookings/upcoming', { params: { days } }),
+  getDashboard: () => api.get('/reports/dashboard'),
+  getTopCustomers: (reportType = 'by_revenue', limit = 10) => api.get('/reports/customers/top', {
+    params: { report_type: reportType, limit }
+  }),
+}
+
 export default api

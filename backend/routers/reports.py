@@ -39,6 +39,411 @@ router = APIRouter(prefix="/reports", tags=["Reports & Analytics"])
 
 
 # ============================================
+# UNIFIED REPORTS ENDPOINT
+# ============================================
+
+@router.get("/")
+def get_unified_report(
+    report_type: str = Query("overview", description="Report type: overview, rooms, bookings, revenue"),
+    date_range: str = Query("all", description="Date range: all, today, week, month, year"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Unified reports endpoint that returns data based on report type and date range.
+
+    **Report Types**:
+    - overview: Overall system statistics
+    - rooms: Room analysis and occupancy
+    - bookings: Booking analysis
+    - revenue: Revenue analysis
+
+    **Date Ranges**:
+    - all: All time data
+    - today: Today's data
+    - week: This week's data
+    - month: This month's data
+    - year: This year's data
+
+    **Access**: All authenticated users
+    """
+    # Calculate date range
+    today = date.today()
+    start_date = None
+    end_date = today
+
+    if date_range == "today":
+        start_date = today
+    elif date_range == "week":
+        start_date = today - timedelta(days=today.weekday())  # Start of week (Monday)
+    elif date_range == "month":
+        start_date = today.replace(day=1)  # Start of month
+    elif date_range == "year":
+        start_date = today.replace(month=1, day=1)  # Start of year
+    # else date_range == "all": no start_date filter
+
+    # ============================================
+    # OVERVIEW REPORT
+    # ============================================
+    if report_type == "overview":
+        # Room stats
+        total_rooms = db.query(Room).filter(Room.is_active == True).count()
+        available_rooms = db.query(Room).filter(
+            Room.is_active == True,
+            Room.status == RoomStatus.AVAILABLE
+        ).count()
+        occupied_rooms = db.query(Room).filter(
+            Room.is_active == True,
+            Room.status == RoomStatus.OCCUPIED
+        ).count()
+        occupancy_rate = (occupied_rooms / total_rooms * 100) if total_rooms > 0 else 0
+
+        # Customer stats
+        customer_query = db.query(Customer)
+        if start_date:
+            customer_query = customer_query.filter(Customer.created_at >= datetime.combine(start_date, datetime.min.time()))
+        total_customers = customer_query.count()
+
+        # Booking stats
+        booking_query = db.query(Booking)
+        if start_date:
+            booking_query = booking_query.filter(
+                Booking.created_at >= datetime.combine(start_date, datetime.min.time()),
+                Booking.created_at <= datetime.combine(end_date, datetime.max.time())
+            )
+
+        total_bookings = booking_query.count()
+        active_bookings = booking_query.filter(
+            Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN])
+        ).count()
+
+        # Revenue stats
+        payment_query = db.query(Payment).filter(Payment.payment_status == PaymentStatus.COMPLETED)
+        if start_date:
+            payment_query = payment_query.filter(
+                Payment.payment_date >= datetime.combine(start_date, datetime.min.time()),
+                Payment.payment_date <= datetime.combine(end_date, datetime.max.time())
+            )
+
+        total_revenue = payment_query.with_entities(func.coalesce(func.sum(Payment.amount), 0)).scalar()
+        avg_booking_value = (total_revenue / total_bookings) if total_bookings > 0 else 0
+
+        # Room type distribution
+        room_types_data = db.query(
+            Room.room_type,
+            func.count(Room.id)
+        ).filter(Room.is_active == True).group_by(Room.room_type).all()
+
+        room_types = [
+            {"name": rt.value.title(), "value": count}
+            for rt, count in room_types_data
+        ]
+
+        # Booking status distribution
+        booking_status_query = booking_query if start_date else db.query(Booking)
+        booking_status_data = booking_status_query.with_entities(
+            Booking.status,
+            func.count(Booking.id)
+        ).group_by(Booking.status).all()
+
+        booking_status = [
+            {"name": status.value.replace('_', ' ').title(), "value": count}
+            for status, count in booking_status_data
+        ]
+
+        # Revenue by month (last 6 months or date range)
+        revenue_by_month = []
+        if start_date:
+            # Calculate months in range
+            current_date = start_date
+            while current_date <= end_date:
+                month_start = datetime.combine(current_date.replace(day=1), datetime.min.time())
+                # Get last day of month
+                if current_date.month == 12:
+                    month_end = datetime.combine(date(current_date.year + 1, 1, 1) - timedelta(days=1), datetime.max.time())
+                else:
+                    month_end = datetime.combine(date(current_date.year, current_date.month + 1, 1) - timedelta(days=1), datetime.max.time())
+
+                month_revenue = db.query(
+                    func.coalesce(func.sum(Payment.amount), 0)
+                ).filter(
+                    Payment.payment_status == PaymentStatus.COMPLETED,
+                    Payment.payment_date >= month_start,
+                    Payment.payment_date <= month_end
+                ).scalar()
+
+                revenue_by_month.append({
+                    "month": current_date.strftime("%b"),
+                    "revenue": float(month_revenue)
+                })
+
+                # Move to next month
+                if current_date.month == 12:
+                    current_date = current_date.replace(year=current_date.year + 1, month=1)
+                else:
+                    current_date = current_date.replace(month=current_date.month + 1)
+        else:
+            # Last 6 months for "all time"
+            for i in range(5, -1, -1):
+                target_date = today - timedelta(days=i*30)
+                month_start = datetime.combine(target_date.replace(day=1), datetime.min.time())
+                if target_date.month == 12:
+                    month_end = datetime.combine(date(target_date.year + 1, 1, 1) - timedelta(days=1), datetime.max.time())
+                else:
+                    month_end = datetime.combine(date(target_date.year, target_date.month + 1, 1) - timedelta(days=1), datetime.max.time())
+
+                month_revenue = db.query(
+                    func.coalesce(func.sum(Payment.amount), 0)
+                ).filter(
+                    Payment.payment_status == PaymentStatus.COMPLETED,
+                    Payment.payment_date >= month_start,
+                    Payment.payment_date <= month_end
+                ).scalar()
+
+                revenue_by_month.append({
+                    "month": target_date.strftime("%b"),
+                    "revenue": float(month_revenue)
+                })
+
+        return {
+            "report_type": "overview",
+            "date_range": date_range,
+            "start_date": start_date.isoformat() if start_date else None,
+            "end_date": end_date.isoformat(),
+            "stats": {
+                "total_rooms": total_rooms,
+                "available_rooms": available_rooms,
+                "occupancy_rate": round(occupancy_rate, 1),
+                "total_bookings": total_bookings,
+                "active_bookings": active_bookings,
+                "total_revenue": float(total_revenue),
+                "avg_booking_value": round(float(avg_booking_value), 0),
+                "total_customers": total_customers
+            },
+            "charts": {
+                "room_types": room_types,
+                "booking_status": booking_status,
+                "revenue_by_month": revenue_by_month
+            }
+        }
+
+    # ============================================
+    # ROOM ANALYSIS REPORT
+    # ============================================
+    elif report_type == "rooms":
+        # Get occupancy report data
+        total_rooms = db.query(Room).count()
+        active_rooms = db.query(Room).filter(Room.is_active == True).count()
+
+        # Status counts
+        status_counts = db.query(
+            Room.status,
+            func.count(Room.id)
+        ).filter(Room.is_active == True).group_by(Room.status).all()
+
+        by_status = [
+            {"status": status.value, "count": count}
+            for status, count in status_counts
+        ]
+
+        # Type occupancy
+        room_types = db.query(Room.room_type).distinct().all()
+        by_type = []
+
+        for (room_type,) in room_types:
+            type_stats = db.query(Room).filter(
+                Room.room_type == room_type,
+                Room.is_active == True
+            )
+
+            total = type_stats.count()
+            available = type_stats.filter(Room.status == RoomStatus.AVAILABLE).count()
+            occupied = type_stats.filter(Room.status == RoomStatus.OCCUPIED).count()
+            reserved = type_stats.filter(Room.status == RoomStatus.RESERVED).count()
+            maintenance = type_stats.filter(Room.status == RoomStatus.MAINTENANCE).count()
+
+            occupancy_rate = (occupied / total * 100) if total > 0 else 0
+
+            by_type.append({
+                "room_type": room_type.value,
+                "total_rooms": total,
+                "available": available,
+                "occupied": occupied,
+                "reserved": reserved,
+                "maintenance": maintenance,
+                "occupancy_rate": round(occupancy_rate, 2)
+            })
+
+        occupied_count = db.query(Room).filter(
+            Room.is_active == True,
+            Room.status == RoomStatus.OCCUPIED
+        ).count()
+
+        overall_occupancy_rate = (occupied_count / active_rooms * 100) if active_rooms > 0 else 0
+
+        return {
+            "report_type": "rooms",
+            "date_range": date_range,
+            "total_rooms": total_rooms,
+            "active_rooms": active_rooms,
+            "by_status": by_status,
+            "by_type": by_type,
+            "overall_occupancy_rate": round(overall_occupancy_rate, 2)
+        }
+
+    # ============================================
+    # BOOKING ANALYSIS REPORT
+    # ============================================
+    elif report_type == "bookings":
+        booking_query = db.query(Booking)
+        if start_date:
+            booking_query = booking_query.filter(
+                Booking.created_at >= datetime.combine(start_date, datetime.min.time()),
+                Booking.created_at <= datetime.combine(end_date, datetime.max.time())
+            )
+
+        total_bookings = booking_query.count()
+
+        # Status breakdown
+        status_breakdown = booking_query.with_entities(
+            Booking.status,
+            func.count(Booking.id)
+        ).group_by(Booking.status).all()
+
+        status_data = [
+            {"status": status.value, "count": count}
+            for status, count in status_breakdown
+        ]
+
+        # Average nights and guests
+        avg_nights = booking_query.with_entities(
+            func.avg(Booking.number_of_nights)
+        ).scalar() or 0
+
+        avg_guests = booking_query.with_entities(
+            func.avg(Booking.number_of_guests)
+        ).scalar() or 0
+
+        # Room type preferences
+        room_type_bookings = booking_query.join(Room).with_entities(
+            Room.room_type,
+            func.count(Booking.id)
+        ).group_by(Room.room_type).all()
+
+        room_preferences = [
+            {"room_type": rt.value, "count": count}
+            for rt, count in room_type_bookings
+        ]
+
+        return {
+            "report_type": "bookings",
+            "date_range": date_range,
+            "start_date": start_date.isoformat() if start_date else None,
+            "end_date": end_date.isoformat(),
+            "total_bookings": total_bookings,
+            "status_breakdown": status_data,
+            "avg_nights": round(float(avg_nights), 1),
+            "avg_guests": round(float(avg_guests), 1),
+            "room_preferences": room_preferences
+        }
+
+    # ============================================
+    # REVENUE ANALYSIS REPORT
+    # ============================================
+    elif report_type == "revenue":
+        payment_query = db.query(Payment).filter(Payment.payment_status == PaymentStatus.COMPLETED)
+        if start_date:
+            payment_query = payment_query.filter(
+                Payment.payment_date >= datetime.combine(start_date, datetime.min.time()),
+                Payment.payment_date <= datetime.combine(end_date, datetime.max.time())
+            )
+
+        total_revenue = payment_query.with_entities(
+            func.coalesce(func.sum(Payment.amount), 0)
+        ).scalar()
+
+        payment_count = payment_query.count()
+
+        # Revenue by payment method
+        payment_method_stats = payment_query.with_entities(
+            Payment.payment_method,
+            func.sum(Payment.amount),
+            func.count(Payment.id)
+        ).group_by(Payment.payment_method).all()
+
+        by_payment_method = [
+            {
+                "payment_method": method.value,
+                "total_amount": float(total),
+                "transaction_count": count
+            }
+            for method, total, count in payment_method_stats
+        ]
+
+        # Daily/Monthly revenue breakdown
+        revenue_breakdown = []
+        if date_range == "today":
+            # Hourly breakdown for today
+            for hour in range(24):
+                hour_start = datetime.combine(today, datetime.min.time()) + timedelta(hours=hour)
+                hour_end = hour_start + timedelta(hours=1)
+
+                hour_revenue = db.query(
+                    func.coalesce(func.sum(Payment.amount), 0)
+                ).filter(
+                    Payment.payment_status == PaymentStatus.COMPLETED,
+                    Payment.payment_date >= hour_start,
+                    Payment.payment_date < hour_end
+                ).scalar()
+
+                revenue_breakdown.append({
+                    "period": f"{hour:02d}:00",
+                    "revenue": float(hour_revenue)
+                })
+        else:
+            # Daily breakdown
+            current_date = start_date if start_date else today - timedelta(days=30)
+            while current_date <= end_date:
+                day_start = datetime.combine(current_date, datetime.min.time())
+                day_end = datetime.combine(current_date, datetime.max.time())
+
+                day_revenue = db.query(
+                    func.coalesce(func.sum(Payment.amount), 0)
+                ).filter(
+                    Payment.payment_status == PaymentStatus.COMPLETED,
+                    Payment.payment_date >= day_start,
+                    Payment.payment_date <= day_end
+                ).scalar()
+
+                revenue_breakdown.append({
+                    "period": current_date.strftime("%Y-%m-%d"),
+                    "revenue": float(day_revenue)
+                })
+
+                current_date += timedelta(days=1)
+
+        avg_transaction_value = (total_revenue / payment_count) if payment_count > 0 else 0
+
+        return {
+            "report_type": "revenue",
+            "date_range": date_range,
+            "start_date": start_date.isoformat() if start_date else None,
+            "end_date": end_date.isoformat(),
+            "total_revenue": float(total_revenue),
+            "payment_count": payment_count,
+            "avg_transaction_value": round(float(avg_transaction_value), 2),
+            "by_payment_method": by_payment_method,
+            "revenue_breakdown": revenue_breakdown
+        }
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid report_type: {report_type}. Must be one of: overview, rooms, bookings, revenue"
+        )
+
+
+# ============================================
 # OCCUPANCY REPORTS
 # ============================================
 
