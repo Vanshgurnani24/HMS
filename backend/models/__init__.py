@@ -4,6 +4,7 @@ from models.room import Room, RoomType, RoomStatus
 from models.customer import Customer
 from models.booking import Booking, BookingStatus
 from models.payment import Payment, PaymentMethod, PaymentStatus
+from models.settings import HotelSettings
 
 __all__ = [
     "User",
@@ -17,4 +18,5 @@ __all__ = [
     "Payment",
     "PaymentMethod",
     "PaymentStatus",
+    "HotelSettings",
 ]

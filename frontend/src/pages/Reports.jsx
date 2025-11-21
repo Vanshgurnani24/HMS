@@ -13,7 +13,7 @@ import {
 } from '@mui/material'
 import { Download, Refresh } from '@mui/icons-material'
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { reportsAPI } from '../api/axios'
+import { reportsAPI, settingsAPI } from '../api/axios'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import html2pdf from 'html2pdf.js'
 
@@ -25,6 +25,20 @@ const Reports = () => {
   const [dateRange, setDateRange] = useState('all')
   const [reportData, setReportData] = useState(null)
   const [error, setError] = useState('')
+  const [hotelName, setHotelName] = useState('My Hotel')
+
+  // Fetch hotel settings on mount
+  useEffect(() => {
+    const fetchHotelSettings = async () => {
+      try {
+        const response = await settingsAPI.getHotelSettings()
+        setHotelName(response.data.hotel_name || 'My Hotel')
+      } catch (err) {
+        console.error('Error fetching hotel settings:', err)
+      }
+    }
+    fetchHotelSettings()
+  }, [])
 
   // Fetch report data whenever reportType or dateRange changes
   useEffect(() => {
@@ -81,7 +95,7 @@ const Reports = () => {
     // Create HTML content for the PDF
     let htmlContent = `
       <div style="padding: 20px; font-family: Arial, sans-serif;">
-        <h1 style="text-align: center; color: #333;">Ajanta Rooms Report</h1>
+        <h1 style="text-align: center; color: #333;">${hotelName} Report</h1>
         <h2 style="text-align: center; color: #666;">${reportTitles[reportType]}</h2>
         <p style="text-align: center; color: #999;">Date Range: ${dateRangeText}</p>
         <p style="text-align: center; color: #999; margin-bottom: 30px;">Generated: ${new Date().toLocaleString()}</p>

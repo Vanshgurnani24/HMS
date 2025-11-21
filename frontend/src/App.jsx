@@ -11,6 +11,7 @@ import Customers from './pages/Customers'
 import Bookings from './pages/Bookings'
 import Billing from './pages/Billing'
 import Reports from './pages/Reports'
+import Settings from './pages/Settings'
 import './App.css'
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
                   <Route path="/bookings" element={<Bookings />} />
                   <Route path="/billing" element={<Billing />} />
                   <Route path="/reports" element={<Reports />} />
+                  <Route path="/settings" element={<Settings />} />
                 </Routes>
               </Box>
             </Box>

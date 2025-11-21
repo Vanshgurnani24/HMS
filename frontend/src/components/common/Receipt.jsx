@@ -11,7 +11,7 @@ import {
 } from '@mui/material'
 import { formatDate } from '../../utils/dateUtils'
 
-const Receipt = forwardRef(({ invoiceData }, ref) => {
+const Receipt = forwardRef(({ invoiceData, hotelName = 'My Hotel' }, ref) => {
   if (!invoiceData) return null
 
   return (
@@ -59,7 +59,7 @@ const Receipt = forwardRef(({ invoiceData }, ref) => {
       {/* Header */}
       <Box sx={{ textAlign: 'center', mb: { xs: 4, print: 2 } }}>
         <Typography variant="h3" sx={{ fontWeight: 700, color: '#1976d2', mb: 1 }}>
-          Ajanta Rooms
+          {hotelName}
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Thank you for choosing our services

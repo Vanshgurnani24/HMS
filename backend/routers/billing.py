@@ -93,14 +93,30 @@ def create_payment(
     """
     # Validate booking
     booking = validate_booking_for_payment(db, payment.booking_id)
-    
-    # Validate payment amount matches booking amount
-    if abs(payment.amount - booking.final_amount) > 0.01:  # Allow for floating point precision
+
+    # Calculate balance due (allows partial payments)
+    existing_payments = db.query(Payment).filter(
+        Payment.booking_id == payment.booking_id,
+        Payment.payment_status.in_([PaymentStatus.COMPLETED, PaymentStatus.PENDING])
+    ).all()
+
+    total_paid = sum(p.amount for p in existing_payments if p.payment_status == PaymentStatus.COMPLETED)
+    total_pending = sum(p.amount for p in existing_payments if p.payment_status == PaymentStatus.PENDING)
+    balance_due = booking.final_amount - total_paid - total_pending
+
+    # Validate payment amount doesn't exceed balance due
+    if payment.amount > balance_due + 0.01:  # Allow for floating point precision
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Payment amount (${payment.amount:.2f}) does not match booking amount (${booking.final_amount:.2f})"
+            detail=f"Payment amount (₹{payment.amount:.2f}) exceeds balance due (₹{balance_due:.2f})"
         )
-    
+
+    if payment.amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment amount must be greater than 0"
+        )
+
     # Generate IDs
     transaction_id = generate_transaction_id()
     invoice_no = generate_invoice_number()

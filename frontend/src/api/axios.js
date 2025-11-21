@@ -113,6 +113,8 @@ export const paymentsAPI = {
   updatePaymentStatus: (id, status, data) => api.patch(`/payments/${id}/status`, { payment_status: status, ...data }),
   refundPayment: (id) => api.post(`/payments/${id}/refund`),
   getPaymentsByBooking: (bookingId) => api.get(`/payments/booking/${bookingId}`),
+  getPaymentSummary: (bookingId) => api.get(`/payments/booking/${bookingId}/summary`),
+  getPaymentHistory: (bookingId) => api.get(`/payments/booking/${bookingId}/history`),
   getInvoiceByPayment: (paymentId) => api.get(`/payments/invoices/payment/${paymentId}`),
   getInvoiceByBooking: (bookingId) => api.get(`/payments/invoices/booking/${bookingId}`),
 }
@@ -135,6 +137,11 @@ export const reportsAPI = {
   getTopCustomers: (reportType = 'by_revenue', limit = 10) => api.get('/reports/customers/top', {
     params: { report_type: reportType, limit }
   }),
+}
+
+export const settingsAPI = {
+  getHotelSettings: () => api.get('/settings/hotel'),
+  updateHotelSettings: (data) => api.put('/settings/hotel', data),
 }
 
 export default api

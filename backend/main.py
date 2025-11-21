@@ -9,8 +9,8 @@ from contextlib import asynccontextmanager
 import uvicorn
 
 from database import engine, Base
-from routers import auth, rooms, customers, bookings, billing, reports
-from models import User, Room, Customer, Booking, Payment
+from routers import auth, rooms, customers, bookings, billing, reports, settings
+from models import User, Room, Customer, Booking, Payment, HotelSettings
 
 # ================================================================
 # Scheduler Imports
@@ -113,6 +113,7 @@ app.include_router(customers.router)
 app.include_router(bookings.router)
 app.include_router(billing.router)
 app.include_router(reports.router)
+app.include_router(settings.router)
 
 
 # ================================================================

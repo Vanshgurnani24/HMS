@@ -16,6 +16,7 @@ import {
   EventNote,
   Payment,
   Assessment,
+  Settings,
 } from '@mui/icons-material'
 import { useNavigate, useLocation } from 'react-router-dom'
 
@@ -28,6 +29,7 @@ const menuItems = [
   { text: 'Bookings', icon: <EventNote />, path: '/bookings' },
   { text: 'Billing', icon: <Payment />, path: '/billing' },
   { text: 'Reports', icon: <Assessment />, path: '/reports' },
+  { text: 'Settings', icon: <Settings />, path: '/settings' },
 ]
 
 const Sidebar = () => {
