@@ -142,6 +142,24 @@ const Customers = () => {
   }
 
   const handleSubmit = async () => {
+    // Validate required fields
+    if (!formData.first_name.trim()) {
+      setError('First name is required')
+      return
+    }
+    if (!formData.last_name.trim()) {
+      setError('Last name is required')
+      return
+    }
+    if (!formData.email.trim()) {
+      setError('Email is required')
+      return
+    }
+    if (!formData.phone.trim()) {
+      setError('Phone is required')
+      return
+    }
+
     try {
       // Prepare form data with file upload
       const submitData = {
@@ -273,6 +291,7 @@ const Customers = () => {
         </DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            {error && <Alert severity="error" sx={{ gridColumn: '1 / -1' }} onClose={() => setError('')}>{error}</Alert>}
             <TextField
               label="First Name"
               name="first_name"

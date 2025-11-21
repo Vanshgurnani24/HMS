@@ -652,6 +652,7 @@ const Billing = () => {
         <DialogTitle>Record Payment</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
             <TextField
               select
               label="Select Booking"

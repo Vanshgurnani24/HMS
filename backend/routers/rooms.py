@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from database import get_db
-from models.room import Room, RoomType, RoomStatus
+from models.room import Room, RoomStatus
 from models.user import User, UserRole
 from schemas.room_schema import (
     RoomCreate,
@@ -64,7 +64,7 @@ def add_room(
 def get_rooms(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=100, description="Maximum number of records to return"),
-    room_type: Optional[RoomType] = Query(None, description="Filter by room type"),
+    room_type: Optional[str] = Query(None, description="Filter by room type"),
     status: Optional[RoomStatus] = Query(None, description="Filter by status"),
     min_price: Optional[float] = Query(None, ge=0, description="Minimum price per night"),
     max_price: Optional[float] = Query(None, ge=0, description="Maximum price per night"),
@@ -246,7 +246,7 @@ def delete_room(
 
 @router.get("/available/check", response_model=RoomListResponse)
 def get_available_rooms(
-    room_type: Optional[RoomType] = Query(None, description="Filter by room type"),
+    room_type: Optional[str] = Query(None, description="Filter by room type"),
     min_price: Optional[float] = Query(None, ge=0),
     max_price: Optional[float] = Query(None, ge=0),
     floor: Optional[int] = Query(None, ge=0),
@@ -283,15 +283,15 @@ def get_available_rooms(
 
 @router.get("/type/{room_type}", response_model=RoomListResponse)
 def get_rooms_by_type(
-    room_type: RoomType,
+    room_type: str,
     status: Optional[RoomStatus] = Query(None, description="Filter by status"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Get all rooms of a specific type.
-    
-    Room types: single, double, suite, deluxe
+
+    Accepts any room type name configured in the system.
     """
     query = db.query(Room).filter(Room.room_type == room_type)
     

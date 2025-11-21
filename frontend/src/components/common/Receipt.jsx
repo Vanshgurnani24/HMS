@@ -191,15 +191,15 @@ const Receipt = forwardRef(({ invoiceData, hotelName = 'My Hotel' }, ref) => {
             <TableBody>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600, py: { xs: 2, print: 0.5 } }}>Description</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 600, py: { xs: 2, print: 0.5 } }}>Quantity</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, py: { xs: 2, print: 0.5 } }}>Unit Price</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 600, py: { xs: 2, print: 0.5 } }}>Number of Nights</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600, py: { xs: 2, print: 0.5 } }}>Price per Night</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 600, py: { xs: 2, print: 0.5 } }}>Amount</TableCell>
               </TableRow>
               {invoiceData.items?.map((item, index) => (
                 <TableRow key={index}>
                   <TableCell sx={{ py: { xs: 2, print: 0.5 } }}>{item.description}</TableCell>
-                  <TableCell align="center" sx={{ py: { xs: 2, print: 0.5 } }}>{item.quantity}</TableCell>
-                  <TableCell align="right" sx={{ py: { xs: 2, print: 0.5 } }}>₹{item.unit_price.toFixed(2)}</TableCell>
+                  <TableCell align="center" sx={{ py: { xs: 2, print: 0.5 } }}>{item.number_of_nights}</TableCell>
+                  <TableCell align="right" sx={{ py: { xs: 2, print: 0.5 } }}>₹{item.price_per_night?.toFixed(2)}</TableCell>
                   <TableCell align="right" sx={{ py: { xs: 2, print: 0.5 } }}>₹{item.amount.toFixed(2)}</TableCell>
                 </TableRow>
               ))}
@@ -246,7 +246,7 @@ const Receipt = forwardRef(({ invoiceData, hotelName = 'My Hotel' }, ref) => {
         <Typography variant="h6" sx={{ fontWeight: 600, mb: { xs: 2, print: 1 } }}>
           Payment Information
         </Typography>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
           <Box>
             <Typography variant="body2" color="text.secondary">
               Payment Status
@@ -261,20 +261,10 @@ const Receipt = forwardRef(({ invoiceData, hotelName = 'My Hotel' }, ref) => {
               {invoiceData.payment_status.charAt(0).toUpperCase() + invoiceData.payment_status.slice(1)}
             </Typography>
           </Box>
-          <Box>
-            <Typography variant="body2" color="text.secondary">
-              Payment Method
-            </Typography>
-            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-              {invoiceData.payment_method.replace('_', ' ').split(' ').map(w =>
-                w.charAt(0).toUpperCase() + w.slice(1)
-              ).join(' ')}
-            </Typography>
-          </Box>
           {invoiceData.payment_date && (
             <Box>
               <Typography variant="body2" color="text.secondary">
-                Payment Date
+                Final Payment Date
               </Typography>
               <Typography variant="body1" sx={{ fontWeight: 500 }}>
                 {formatDate(invoiceData.payment_date)}
@@ -282,6 +272,39 @@ const Receipt = forwardRef(({ invoiceData, hotelName = 'My Hotel' }, ref) => {
             </Box>
           )}
         </Box>
+
+        {/* Payment Breakdown */}
+        {invoiceData.payment_history && invoiceData.payment_history.length > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+              Payment Breakdown
+            </Typography>
+            <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+              <Table size="small">
+                <TableBody>
+                  <TableRow sx={{ bgcolor: 'grey.100' }}>
+                    <TableCell sx={{ fontWeight: 600, py: 1 }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 600, py: 1 }}>Method</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, py: 1 }}>Amount</TableCell>
+                  </TableRow>
+                  {invoiceData.payment_history.map((payment, index) => (
+                    <TableRow key={index}>
+                      <TableCell sx={{ py: 1 }}>{formatDate(payment.payment_date)}</TableCell>
+                      <TableCell sx={{ py: 1 }}>{payment.payment_method}</TableCell>
+                      <TableCell align="right" sx={{ py: 1 }}>₹{payment.amount.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow sx={{ bgcolor: 'grey.50' }}>
+                    <TableCell colSpan={2} sx={{ fontWeight: 600, py: 1 }}>Total Paid</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, py: 1 }}>
+                      ₹{invoiceData.payment_history.reduce((sum, p) => sum + p.amount, 0).toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </Paper>
+          </Box>
+        )}
       </Box>
 
       <Divider sx={{ mb: { xs: 3, print: 1 } }} />

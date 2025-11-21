@@ -144,4 +144,12 @@ export const settingsAPI = {
   updateHotelSettings: (data) => api.put('/settings/hotel', data),
 }
 
+export const roomTypesAPI = {
+  getRoomTypes: (includeInactive = false) => api.get('/room-types/', { params: { include_inactive: includeInactive } }),
+  getRoomType: (id) => api.get(`/room-types/${id}`),
+  createRoomType: (data) => api.post('/room-types/', data),
+  updateRoomType: (id, data) => api.put(`/room-types/${id}`, data),
+  deleteRoomType: (id) => api.delete(`/room-types/${id}`),
+}
+
 export default api

@@ -30,7 +30,7 @@ import {
   Logout,
   HowToReg,
 } from '@mui/icons-material'
-import { bookingsAPI, roomsAPI, customersAPI } from '../api/axios'
+import { bookingsAPI, roomsAPI, customersAPI, roomTypesAPI } from '../api/axios'
 import { BOOKING_STATUS_LABELS, STATUS_COLORS } from '../utils/constants'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import { formatDate } from '../utils/dateUtils'
@@ -39,6 +39,7 @@ const Bookings = () => {
   const [bookings, setBookings] = useState([])
   const [rooms, setRooms] = useState([])
   const [customers, setCustomers] = useState([])
+  const [roomTypes, setRoomTypes] = useState([])
   const [loading, setLoading] = useState(true)
   const [openDialog, setOpenDialog] = useState(false)
   const [error, setError] = useState('')
@@ -55,7 +56,23 @@ const Bookings = () => {
 
   useEffect(() => {
     fetchData()
+    fetchRoomTypes()
   }, [])
+
+  const fetchRoomTypes = async () => {
+    try {
+      const response = await roomTypesAPI.getRoomTypes()
+      setRoomTypes(response.data.room_types || [])
+    } catch (err) {
+      console.error('Error fetching room types:', err)
+    }
+  }
+
+  // Helper to get room type display name
+  const getRoomTypeLabel = (typeName) => {
+    const roomType = roomTypes.find(rt => rt.name === typeName)
+    return roomType ? roomType.display_name : typeName
+  }
 
   const fetchData = async () => {
     try {
@@ -103,10 +120,35 @@ const Bookings = () => {
   }
 
   const handleSubmit = async () => {
+    // Validate required fields
+    const customerId = formData.customer_id?.id || formData.customer_id
+    const roomId = formData.room_id?.id || formData.room_id
+
+    if (!customerId) {
+      setError('Please select a customer')
+      return
+    }
+    if (!roomId) {
+      setError('Please select a room')
+      return
+    }
+    if (!formData.check_in_date) {
+      setError('Check-in date is required')
+      return
+    }
+    if (!formData.check_out_date) {
+      setError('Check-out date is required')
+      return
+    }
+    if (!formData.number_of_guests || parseInt(formData.number_of_guests) <= 0) {
+      setError('Number of guests is required')
+      return
+    }
+
     try {
       const submitData = {
-        customer_id: formData.customer_id?.id || formData.customer_id,
-        room_id: formData.room_id?.id || formData.room_id,
+        customer_id: customerId,
+        room_id: roomId,
         check_in_date: formData.check_in_date,
         check_out_date: formData.check_out_date,
         number_of_guests: parseInt(formData.number_of_guests),
@@ -126,7 +168,11 @@ const Bookings = () => {
       fetchData()
     } catch (error) {
       console.error('Error creating booking:', error)
-      setError(error.response?.data?.detail || 'Failed to create booking')
+      if (error.response?.status === 409) {
+        setError('This room is already booked for the selected dates. Please choose different dates or another room.')
+      } else {
+        setError(error.response?.data?.detail || 'Failed to create booking')
+      }
     }
   }
 
@@ -332,6 +378,7 @@ const Bookings = () => {
         <DialogTitle>Create New Booking</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
             <Autocomplete
               options={customers}
               getOptionLabel={(option) => `${option.first_name} ${option.last_name} (${option.email})`}
@@ -345,7 +392,7 @@ const Bookings = () => {
             />
             <Autocomplete
               options={rooms.filter(r => r.status === 'available')}
-              getOptionLabel={(option) => `${option.room_number} - ${option.room_type} (₹${option.price_per_night}/night)`}
+              getOptionLabel={(option) => `${option.room_number} - ${getRoomTypeLabel(option.room_type)} (₹${option.price_per_night}/night)`}
               value={formData.room_id}
               onChange={(event, newValue) => {
                 setFormData({ ...formData, room_id: newValue })

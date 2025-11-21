@@ -146,7 +146,7 @@ def get_upcoming_checkin_alerts():
             alerts.append({
                 "booking_reference": booking.booking_reference,
                 "room_number": booking.room.room_number,
-                "room_type": booking.room.room_type.value,
+                "room_type": booking.room.room_type,
                 "customer_name": f"{booking.customer.first_name} {booking.customer.last_name}",
                 "number_of_guests": booking.number_of_guests,
                 "special_requests": booking.special_requests

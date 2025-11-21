@@ -101,9 +101,17 @@ class PaymentListResponse(BaseModel):
 class InvoiceItemDetail(BaseModel):
     """Schema for invoice line item"""
     description: str
-    quantity: int
-    unit_price: float
+    number_of_nights: int
+    price_per_night: float
     amount: float
+
+
+class PaymentBreakdownItem(BaseModel):
+    """Schema for payment breakdown in receipt"""
+    payment_date: datetime
+    amount: float
+    payment_method: str
+    transaction_id: str
 
 
 class InvoiceResponse(BaseModel):
@@ -143,6 +151,9 @@ class InvoiceResponse(BaseModel):
     payment_method: str
     payment_date: Optional[datetime] = None
     created_at: datetime
+
+    # Payment History Breakdown
+    payment_history: list[PaymentBreakdownItem] = []
 
 
 class PaymentSummary(BaseModel):

@@ -8,9 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 
-from database import engine, Base
-from routers import auth, rooms, customers, bookings, billing, reports, settings
-from models import User, Room, Customer, Booking, Payment, HotelSettings
+from database import engine, Base, SessionLocal
+from routers import auth, rooms, customers, bookings, billing, reports, settings, room_types
+from models import User, Room, Customer, Booking, Payment, HotelSettings, RoomTypeConfig
+from models.user import UserRole
+from utils.auth import get_password_hash
 
 # ================================================================
 # Scheduler Imports
@@ -29,6 +31,29 @@ from scheduler import run_daily_tasks  # main scheduler executor
 scheduler = BackgroundScheduler()
 
 
+def seed_default_admin():
+    """Create default admin user if no users exist."""
+    db = SessionLocal()
+    try:
+        existing_user = db.query(User).first()
+        if not existing_user:
+            admin_user = User(
+                email="admin@hotel.com",
+                username="admin",
+                hashed_password=get_password_hash("admin"),
+                full_name="Administrator",
+                role=UserRole.ADMIN,
+                is_active=True
+            )
+            db.add(admin_user)
+            db.commit()
+            print("✅ Default admin user created (username: admin, password: admin)")
+        else:
+            print("✓ Users already exist, skipping admin seed")
+    finally:
+        db.close()
+
+
 # ================================================================
 # MODERN FASTAPI LIFESPAN HANDLER (REPLACES on_event)
 # ================================================================
@@ -41,6 +66,9 @@ async def lifespan(app: FastAPI):
     print("\n" + "=" * 60)
     print("🚀 HMS Server Starting...")
     print("=" * 60)
+
+    # Seed default admin user
+    seed_default_admin()
 
     # Run tasks immediately (only runs once/day internally)
     print("\n🔍 Checking if daily tasks need to run...")
@@ -109,6 +137,7 @@ app.add_middleware(
 # ================================================================
 app.include_router(auth.router)
 app.include_router(rooms.router)
+app.include_router(room_types.router)
 app.include_router(customers.router)
 app.include_router(bookings.router)
 app.include_router(billing.router)

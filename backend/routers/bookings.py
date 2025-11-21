@@ -629,22 +629,24 @@ def get_todays_checkouts(
 
 
 # ✅ NEW: Get notifications for upcoming check-ins
-@router.get("/alerts/upcoming-checkins", response_model=BookingListResponse)
+@router.get("/alerts/upcoming-checkins")
 def get_upcoming_checkin_alerts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get bookings with check-in scheduled for tomorrow.
-    
-    **Purpose:** Alert staff about rooms that should NOT be allocated 
-    as they have confirmed bookings starting tomorrow.
-    
-    Returns confirmed bookings with check_in_date = tomorrow.
+    Get bookings with check-in scheduled for tomorrow AND urgent checkout alerts.
+
+    **Purpose:** Alert staff about:
+    1. Rooms that should NOT be allocated (confirmed bookings starting tomorrow)
+    2. Rooms that need URGENT checkout (guest checked-in but another booking starts tomorrow)
+
+    Returns confirmed bookings with check_in_date = tomorrow and urgent checkout alerts.
     """
     tomorrow = date.today() + timedelta(days=1)
-    
-    bookings = db.query(Booking).options(
+
+    # 1. Get confirmed bookings starting tomorrow
+    upcoming_checkins = db.query(Booking).options(
         joinedload(Booking.customer),
         joinedload(Booking.room),
         joinedload(Booking.created_by_user)
@@ -652,10 +654,43 @@ def get_upcoming_checkin_alerts(
         Booking.check_in_date == tomorrow,
         Booking.status == BookingStatus.CONFIRMED
     ).all()
-    
+
+    # 2. Find rooms with guests currently checked-in that have bookings starting tomorrow
+    # Get all room IDs that have bookings starting tomorrow
+    rooms_with_tomorrow_bookings = [b.room_id for b in upcoming_checkins]
+
+    # Find current checked-in bookings for those rooms
+    urgent_checkouts = []
+    if rooms_with_tomorrow_bookings:
+        urgent_checkouts = db.query(Booking).options(
+            joinedload(Booking.customer),
+            joinedload(Booking.room),
+            joinedload(Booking.created_by_user)
+        ).filter(
+            Booking.room_id.in_(rooms_with_tomorrow_bookings),
+            Booking.status == BookingStatus.CHECKED_IN
+        ).all()
+
     return {
-        "total": len(bookings),
-        "bookings": bookings
+        "total": len(upcoming_checkins),
+        "bookings": upcoming_checkins,
+        "urgent_checkouts": [{
+            "id": b.id,
+            "booking_reference": b.booking_reference,
+            "customer": {
+                "first_name": b.customer.first_name,
+                "last_name": b.customer.last_name
+            } if b.customer else None,
+            "room": {
+                "id": b.room.id,
+                "room_number": b.room.room_number,
+                "room_type": b.room.room_type
+            } if b.room else None,
+            "check_in_date": b.check_in_date.isoformat(),
+            "check_out_date": b.check_out_date.isoformat(),
+            "number_of_guests": b.number_of_guests
+        } for b in urgent_checkouts],
+        "urgent_checkout_count": len(urgent_checkouts)
     }
 
 
@@ -710,7 +745,7 @@ def get_booking_receipt(
         customer_name=f"{booking.customer.first_name} {booking.customer.last_name}",
         customer_email=booking.customer.email,
         room_number=booking.room.room_number,
-        room_type=booking.room.room_type.value,
+        room_type=booking.room.room_type,
         check_in_date=booking.check_in_date,
         check_out_date=booking.check_out_date,
         number_of_nights=booking.number_of_nights,

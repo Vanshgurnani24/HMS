@@ -25,6 +25,7 @@ from schemas.payment_schema import (
     PaymentListResponse,
     InvoiceResponse,
     InvoiceItemDetail,
+    PaymentBreakdownItem,
     PaymentSummary,
     RefundRequest,
     RefundResponse
@@ -405,55 +406,85 @@ def get_invoice_by_booking(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Generate and retrieve invoice for a booking.
-    
+    Generate and retrieve invoice/receipt for a booking.
+
+    **IMPORTANT:** Receipt is only generated when payment is complete (balance = 0).
+
     **Invoice Details Include:**
     - Booking information
     - Customer details
     - Room information
     - Itemized charges breakdown
-    - Payment information
+    - Payment history with breakdown by method
     - Total amount with tax
     """
     # Get booking with relationships
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
-    
+
     if not booking:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Booking with ID {booking_id} not found"
         )
-    
-    # Get associated payment
-    payment = db.query(Payment).filter(Payment.booking_id == booking_id).first()
-    
-    if not payment:
+
+    # Get all completed payments for this booking
+    completed_payments = db.query(Payment).filter(
+        Payment.booking_id == booking_id,
+        Payment.payment_status == PaymentStatus.COMPLETED
+    ).order_by(Payment.created_at).all()
+
+    if not completed_payments:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No payment found for booking {booking_id}"
+            detail=f"No completed payment found for booking {booking_id}"
         )
-    
+
+    # Calculate total paid and balance due
+    total_paid = sum(p.amount for p in completed_payments)
+    balance_due = booking.final_amount - total_paid
+
+    # Block receipt generation if payment is not complete
+    if balance_due > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot generate receipt. Payment incomplete. Balance due: ₹{balance_due:.2f}"
+        )
+
+    # Build payment history breakdown
+    payment_history = [
+        PaymentBreakdownItem(
+            payment_date=p.created_at,
+            amount=p.amount,
+            payment_method=p.payment_method.value.replace('_', ' ').title(),
+            transaction_id=p.transaction_id
+        )
+        for p in completed_payments
+    ]
+
     # Build invoice items
     items = [
         InvoiceItemDetail(
-            description=f"Room {booking.room.room_number} - {booking.room.room_type.value.title()}",
-            quantity=booking.number_of_nights,
-            unit_price=booking.room_price,
+            description=f"Room {booking.room.room_number} - {booking.room.room_type.replace('_', ' ').title()}",
+            number_of_nights=booking.number_of_nights,
+            price_per_night=booking.room_price,
             amount=booking.total_amount
         )
     ]
-    
+
+    # Use the first payment for invoice number and date
+    first_payment = completed_payments[0]
+
     # Create invoice response
     invoice = InvoiceResponse(
-        invoice_no=f"INV-{payment.transaction_id}",
-        invoice_date=payment.created_at,
+        invoice_no=f"INV-{first_payment.transaction_id}",
+        invoice_date=first_payment.created_at,
         booking_id=booking.id,
         booking_reference=booking.booking_reference,
         customer_name=f"{booking.customer.first_name} {booking.customer.last_name}",
         customer_email=booking.customer.email,
         customer_phone=booking.customer.phone,
         room_number=booking.room.room_number,
-        room_type=booking.room.room_type.value.title(),
+        room_type=booking.room.room_type.replace('_', ' ').title(),
         check_in_date=booking.check_in_date,
         check_out_date=booking.check_out_date,
         number_of_nights=booking.number_of_nights,
@@ -462,12 +493,13 @@ def get_invoice_by_booking(
         discount=booking.discount,
         tax=booking.tax,
         total_amount=booking.final_amount,
-        payment_status=payment.payment_status.value,
-        payment_method=payment.payment_method.value,
-        payment_date=payment.payment_date,
-        created_at=payment.created_at
+        payment_status="completed",
+        payment_method="multiple" if len(completed_payments) > 1 else first_payment.payment_method.value,
+        payment_date=completed_payments[-1].payment_date,  # Last payment date
+        created_at=first_payment.created_at,
+        payment_history=payment_history
     )
-    
+
     return invoice
 
 

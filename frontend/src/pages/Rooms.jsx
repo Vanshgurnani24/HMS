@@ -21,8 +21,8 @@ import {
   Alert,
 } from '@mui/material'
 import { Add, Edit, Delete, Refresh } from '@mui/icons-material'
-import { roomsAPI } from '../api/axios'
-import { ROOM_TYPES, ROOM_STATUS, ROOM_TYPE_LABELS, ROOM_STATUS_LABELS, STATUS_COLORS } from '../utils/constants'
+import { roomsAPI, roomTypesAPI } from '../api/axios'
+import { ROOM_STATUS, ROOM_STATUS_LABELS, STATUS_COLORS } from '../utils/constants'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 
 const Rooms = () => {
@@ -32,10 +32,11 @@ const Rooms = () => {
   const [selectedRoom, setSelectedRoom] = useState(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [roomTypes, setRoomTypes] = useState([])
   const [formData, setFormData] = useState({
     room_number: '',
-    room_type: ROOM_TYPES.SINGLE,
-    status: ROOM_STATUS.AVAILABLE, // Added status field
+    room_type: '',
+    status: ROOM_STATUS.AVAILABLE,
     price_per_night: '',
     floor: '',
     capacity: '',
@@ -45,7 +46,23 @@ const Rooms = () => {
 
   useEffect(() => {
     fetchRooms()
+    fetchRoomTypes()
   }, [])
+
+  const fetchRoomTypes = async () => {
+    try {
+      const response = await roomTypesAPI.getRoomTypes()
+      setRoomTypes(response.data.room_types || [])
+    } catch (err) {
+      console.error('Error fetching room types:', err)
+    }
+  }
+
+  // Helper to get room type display name
+  const getRoomTypeLabel = (typeName) => {
+    const roomType = roomTypes.find(rt => rt.name === typeName)
+    return roomType ? roomType.display_name : typeName
+  }
 
   const fetchRooms = async () => {
     try {
@@ -77,7 +94,7 @@ const Rooms = () => {
       setSelectedRoom(null)
       setFormData({
         room_number: '',
-        room_type: ROOM_TYPES.SINGLE,
+        room_type: roomTypes.length > 0 ? roomTypes[0].name : '',
         status: ROOM_STATUS.AVAILABLE, // Default status for new rooms
         price_per_night: '',
         floor: '',
@@ -104,6 +121,28 @@ const Rooms = () => {
   }
 
   const handleSubmit = async () => {
+    // Validate required fields
+    if (!formData.room_number.trim()) {
+      setError('Room number is required')
+      return
+    }
+    if (!formData.room_type) {
+      setError('Room type is required')
+      return
+    }
+    if (!formData.price_per_night || parseFloat(formData.price_per_night) <= 0) {
+      setError('Valid price per night is required')
+      return
+    }
+    if (formData.floor === '' || parseInt(formData.floor) < 0) {
+      setError('Valid floor number is required')
+      return
+    }
+    if (!formData.capacity || parseInt(formData.capacity) <= 0) {
+      setError('Valid capacity is required')
+      return
+    }
+
     try {
       const submitData = {
         ...formData,
@@ -199,7 +238,7 @@ const Rooms = () => {
               rooms.map((room) => (
                 <TableRow key={room.id}>
                   <TableCell>{room.room_number}</TableCell>
-                  <TableCell>{ROOM_TYPE_LABELS[room.room_type]}</TableCell>
+                  <TableCell>{getRoomTypeLabel(room.room_type)}</TableCell>
                   <TableCell>
                     <Chip
                       label={ROOM_STATUS_LABELS[room.status]}
@@ -240,6 +279,7 @@ const Rooms = () => {
         </DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
             <TextField
               label="Room Number"
               name="room_number"
@@ -257,11 +297,15 @@ const Rooms = () => {
               required
               fullWidth
             >
-              {Object.entries(ROOM_TYPE_LABELS).map(([value, label]) => (
-                <MenuItem key={value} value={value}>
-                  {label}
-                </MenuItem>
-              ))}
+              {roomTypes.length === 0 ? (
+                <MenuItem disabled>No room types available</MenuItem>
+              ) : (
+                roomTypes.map((rt) => (
+                  <MenuItem key={rt.id} value={rt.name}>
+                    {rt.display_name}
+                  </MenuItem>
+                ))
+              )}
             </TextField>
             
             {/* NEW: Status Dropdown */}

@@ -5,6 +5,7 @@ import enum
 from database import Base
 
 
+# Keep enum for backward compatibility but room_type column now uses String
 class RoomType(str, enum.Enum):
     SINGLE = "single"
     DOUBLE = "double"
@@ -21,10 +22,10 @@ class RoomStatus(str, enum.Enum):
 
 class Room(Base):
     __tablename__ = "rooms"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     room_number = Column(String, unique=True, index=True, nullable=False)
-    room_type = Column(Enum(RoomType), nullable=False)
+    room_type = Column(String, nullable=False)  # Changed from Enum to String for dynamic room types
     status = Column(Enum(RoomStatus), default=RoomStatus.AVAILABLE, nullable=False)
     price_per_night = Column(Float, nullable=False)
     floor = Column(Integer, nullable=False)

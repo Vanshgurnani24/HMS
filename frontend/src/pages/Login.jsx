@@ -35,15 +35,30 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    // Validate before submission
+    if (!formData.username.trim()) {
+      setError('Username is required')
+      return
+    }
+    if (!formData.password) {
+      setError('Password is required')
+      return
+    }
+
     setLoading(true)
     setError('')
 
-    const result = await login(formData.username, formData.password)
+    try {
+      const result = await login(formData.username, formData.password)
 
-    if (result.success) {
-      navigate('/dashboard')
-    } else {
-      setError(result.error)
+      if (result.success) {
+        navigate('/dashboard')
+      } else {
+        setError(result.error || 'Login failed')
+      }
+    } catch (err) {
+      setError('An error occurred. Please try again.')
     }
 
     setLoading(false)
@@ -140,7 +155,7 @@ const Login = () => {
                 Username: admin
               </Typography>
               <Typography variant="caption" display="block">
-                Password: admin@123
+                Password: admin
               </Typography>
             </Box>
           </Box>

@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 from collections import defaultdict
 
 from database import get_db
-from models.room import Room, RoomType, RoomStatus
+from models.room import Room, RoomStatus
 from models.booking import Booking, BookingStatus
 from models.payment import Payment, PaymentMethod, PaymentStatus
 from models.customer import Customer
@@ -135,7 +135,7 @@ def get_unified_report(
         ).filter(Room.is_active == True).group_by(Room.room_type).all()
 
         room_types = [
-            {"name": rt.value.title(), "value": count}
+            {"name": rt.replace('_', ' ').title(), "value": count}
             for rt, count in room_types_data
         ]
 
@@ -265,7 +265,7 @@ def get_unified_report(
             occupancy_rate = (occupied / total * 100) if total > 0 else 0
 
             by_type.append({
-                "room_type": room_type.value,
+                "room_type": room_type,
                 "total_rooms": total,
                 "available": available,
                 "occupied": occupied,
@@ -331,7 +331,7 @@ def get_unified_report(
         ).group_by(Room.room_type).all()
 
         room_preferences = [
-            {"room_type": rt.value, "count": count}
+            {"room_type": rt, "count": count}
             for rt, count in room_type_bookings
         ]
 
@@ -536,7 +536,7 @@ def get_occupancy_report(
 
 @router.get("/occupancy/type/{room_type}", response_model=RoomTypeOccupancy)
 def get_occupancy_by_type(
-    room_type: RoomType,
+    room_type: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

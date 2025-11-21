@@ -1,13 +1,13 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
-from models.room import RoomType, RoomStatus
+from models.room import RoomStatus
 
 
 # Room Schemas
 class RoomBase(BaseModel):
     room_number: str
-    room_type: RoomType
+    room_type: str  # Changed from RoomType enum to str for dynamic room types
     price_per_night: float = Field(..., gt=0, description="Price must be greater than 0")
     floor: int = Field(..., ge=0, description="Floor number")
     capacity: int = Field(..., gt=0, description="Room capacity")
@@ -23,7 +23,7 @@ class RoomCreate(RoomBase):
 class RoomUpdate(BaseModel):
     """Schema for updating room details (all fields optional)"""
     room_number: Optional[str] = None
-    room_type: Optional[RoomType] = None
+    room_type: Optional[str] = None  # Changed from RoomType enum to str
     status: Optional[RoomStatus] = None
     price_per_night: Optional[float] = Field(None, gt=0)
     floor: Optional[int] = Field(None, ge=0)
