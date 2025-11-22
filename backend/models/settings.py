@@ -11,5 +11,6 @@ class HotelSettings(Base):
     hotel_address = Column(String, nullable=True)
     hotel_phone = Column(String, nullable=True)
     hotel_email = Column(String, nullable=True)
+    gst_number = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

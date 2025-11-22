@@ -44,6 +44,8 @@ const Dashboard = () => {
   const [todayCheckins, setTodayCheckins] = useState([])
   const [todayCheckouts, setTodayCheckouts] = useState([])
   const [tomorrowCheckins, setTomorrowCheckins] = useState([])
+  const [currentlyCheckedIn, setCurrentlyCheckedIn] = useState([])
+  const [checkedOutToday, setCheckedOutToday] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -100,8 +102,13 @@ const Dashboard = () => {
       const todayArrivals = bookings.filter(
         b => b.check_in_date === today && (b.status === 'confirmed' || b.status === 'checked_in')
       )
+      // Today's checkouts - those who need to check out today (still checked in)
       const todayDepartures = bookings.filter(
         b => b.check_out_date === today && b.status === 'checked_in'
+      )
+      // Already checked out today
+      const alreadyCheckedOut = bookings.filter(
+        b => b.check_out_date === today && b.status === 'checked_out'
       )
       const tomorrowArrivals = bookings.filter(
         b => b.check_in_date === tomorrow && b.status === 'confirmed'
@@ -110,6 +117,11 @@ const Dashboard = () => {
       setTodayCheckins(todayArrivals)
       setTodayCheckouts(todayDepartures)
       setTomorrowCheckins(tomorrowArrivals)
+      setCheckedOutToday(alreadyCheckedOut)
+
+      // Get all currently checked-in customers
+      const checkedInBookings = bookings.filter(b => b.status === 'checked_in')
+      setCurrentlyCheckedIn(checkedInBookings)
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
@@ -281,8 +293,8 @@ const Dashboard = () => {
                 No check-outs scheduled for today
               </Typography>
             ) : (
-              <List dense>
-                {todayCheckouts.slice(0, 3).map((booking) => (
+              <List dense sx={{ maxHeight: 200, overflow: 'auto' }}>
+                {todayCheckouts.map((booking) => (
                   <ListItem key={booking.id} sx={{ px: 0 }}>
                     <ListItemIcon sx={{ minWidth: 40 }}>
                       <Avatar sx={{ width: 32, height: 32, bgcolor: 'warning.light' }}>
@@ -295,11 +307,6 @@ const Dashboard = () => {
                     />
                   </ListItem>
                 ))}
-                {todayCheckouts.length > 3 && (
-                  <Typography variant="caption" color="text.secondary" sx={{ pl: 1 }}>
-                    +{todayCheckouts.length - 3} more
-                  </Typography>
-                )}
               </List>
             )}
           </Paper>
@@ -336,6 +343,128 @@ const Dashboard = () => {
                     +{tomorrowCheckins.length - 3} more
                   </Typography>
                 )}
+              </List>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Currently Checked-In Customers */}
+      <Grid container spacing={3} sx={{ mt: 2 }}>
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <CheckInIcon color="primary" />
+              <Typography variant="h6">Currently Checked-In Guests</Typography>
+              <Chip label={currentlyCheckedIn.length} size="small" color="primary" />
+            </Box>
+            {currentlyCheckedIn.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No guests currently checked in
+              </Typography>
+            ) : (
+              <List dense sx={{ '& .MuiListItem-root': { px: 0 } }}>
+                {currentlyCheckedIn.map((booking, index) => (
+                  <Box key={booking.id}>
+                    <ListItem>
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}>
+                          <Person fontSize="small" />
+                        </Avatar>
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body1" fontWeight={500}>
+                              {booking.customer?.first_name} {booking.customer?.last_name}
+                            </Typography>
+                            <Chip
+                              label={booking.status.replace('_', ' ')}
+                              size="small"
+                              color="success"
+                              sx={{ height: 20, fontSize: '0.7rem' }}
+                            />
+                          </Box>
+                        }
+                        secondary={
+                          <Box>
+                            <Typography variant="body2" color="text.secondary" display="inline">
+                              Room {booking.room?.room_number} • {booking.room?.room_type}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" display="block">
+                              {booking.number_of_guests} guest(s) • Check-out: {formatDate(booking.check_out_date)}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Booking Ref: {booking.booking_reference}
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </ListItem>
+                    {index < currentlyCheckedIn.length - 1 && <Divider />}
+                  </Box>
+                ))}
+              </List>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Checked Out Today */}
+      <Grid container spacing={3} sx={{ mt: 2 }}>
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <CheckOutIcon color="success" />
+              <Typography variant="h6">Checked Out Today</Typography>
+              <Chip label={checkedOutToday.length} size="small" color="success" />
+            </Box>
+            {checkedOutToday.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No guests have checked out today yet
+              </Typography>
+            ) : (
+              <List dense sx={{ '& .MuiListItem-root': { px: 0 } }}>
+                {checkedOutToday.map((booking, index) => (
+                  <Box key={booking.id}>
+                    <ListItem>
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Avatar sx={{ width: 36, height: 36, bgcolor: 'success.light' }}>
+                          <Person fontSize="small" />
+                        </Avatar>
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body1" fontWeight={500}>
+                              {booking.customer?.first_name} {booking.customer?.last_name}
+                            </Typography>
+                            <Chip
+                              label={booking.status.replace('_', ' ')}
+                              size="small"
+                              color="default"
+                              sx={{ height: 20, fontSize: '0.7rem' }}
+                            />
+                          </Box>
+                        }
+                        secondary={
+                          <Box>
+                            <Typography variant="body2" color="text.secondary" display="inline">
+                              Room {booking.room?.room_number} • {booking.room?.room_type}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" display="block">
+                              Stay: {formatDate(booking.check_in_date)} - {formatDate(booking.check_out_date)}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              Booking Ref: {booking.booking_reference}
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </ListItem>
+                    {index < checkedOutToday.length - 1 && <Divider />}
+                  </Box>
+                ))}
               </List>
             )}
           </Paper>

@@ -22,21 +22,108 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor to handle errors
+// Flag to prevent multiple refresh attempts
+let isRefreshing = false
+let failedQueue = []
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve(token)
+    }
+  })
+
+  failedQueue = []
+}
+
+// Response interceptor to handle errors and token refresh
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Don't redirect if the error is from the login endpoint itself
-      const isLoginRequest = error.config?.url?.includes('/auth/login')
+  async (error) => {
+    const originalRequest = error.config
 
-      if (!isLoginRequest) {
-        // Unauthorized - clear token and redirect to login
+    if (error.response?.status === 401) {
+      // Don't try to refresh on login, refresh, or if already retried
+      const isLoginRequest = originalRequest?.url?.includes('/auth/login')
+      const isRefreshRequest = originalRequest?.url?.includes('/auth/refresh')
+
+      if (isLoginRequest || isRefreshRequest) {
+        return Promise.reject(error)
+      }
+
+      if (originalRequest._retry) {
+        // Already tried refreshing, logout user
         localStorage.removeItem('token')
+        localStorage.removeItem('refreshToken')
         localStorage.removeItem('user')
         window.location.href = '/login'
+        return Promise.reject(error)
+      }
+
+      if (isRefreshing) {
+        // Queue this request while refresh is in progress
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        })
+          .then(token => {
+            originalRequest.headers.Authorization = `Bearer ${token}`
+            return api(originalRequest)
+          })
+          .catch(err => {
+            return Promise.reject(err)
+          })
+      }
+
+      originalRequest._retry = true
+      isRefreshing = true
+
+      const refreshToken = localStorage.getItem('refreshToken')
+
+      // Check for missing, null, or "undefined" string (from legacy users)
+      if (!refreshToken || refreshToken === 'undefined') {
+        // No valid refresh token, logout
+        localStorage.removeItem('token')
+        localStorage.removeItem('refreshToken')
+        localStorage.removeItem('user')
+        window.location.href = '/login'
+        return Promise.reject(error)
+      }
+
+      try {
+        // Try to refresh the token
+        const response = await api.post('/auth/refresh', null, {
+          params: { refresh_token: refreshToken }
+        })
+
+        const { access_token, refresh_token: new_refresh_token } = response.data
+
+        localStorage.setItem('token', access_token)
+        localStorage.setItem('refreshToken', new_refresh_token)
+
+        // Update authorization header
+        api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
+        originalRequest.headers.Authorization = `Bearer ${access_token}`
+
+        processQueue(null, access_token)
+        isRefreshing = false
+
+        // Retry the original request
+        return api(originalRequest)
+      } catch (refreshError) {
+        processQueue(refreshError, null)
+        isRefreshing = false
+
+        // Refresh failed, logout user
+        localStorage.removeItem('token')
+        localStorage.removeItem('refreshToken')
+        localStorage.removeItem('user')
+        window.location.href = '/login'
+        return Promise.reject(refreshError)
       }
     }
+
     return Promise.reject(error)
   }
 )

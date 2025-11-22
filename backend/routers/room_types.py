@@ -62,15 +62,22 @@ def seed_default_room_types(db: Session):
     db.commit()
 
 
+@router.post("/seed-defaults")
+def seed_defaults(db: Session = Depends(get_db)):
+    """
+    Manually seed default room types.
+    Use this endpoint for initial setup or to restore default room types.
+    """
+    seed_default_room_types(db)
+    return {"message": "Default room types seeded successfully"}
+
+
 @router.get("/", response_model=RoomTypeListResponse)
 def get_room_types(
     include_inactive: bool = False,
     db: Session = Depends(get_db)
 ):
     """Get all room types."""
-    # Seed default types if none exist
-    seed_default_room_types(db)
-
     query = db.query(RoomTypeConfig)
 
     if not include_inactive:

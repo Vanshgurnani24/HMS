@@ -21,6 +21,7 @@ class HotelSettingsBase(BaseModel):
     hotel_address: Optional[str] = None
     hotel_phone: Optional[str] = None
     hotel_email: Optional[str] = None
+    gst_number: Optional[str] = None
 
 
 class HotelSettingsResponse(HotelSettingsBase):
@@ -37,6 +38,7 @@ class HotelSettingsUpdate(BaseModel):
     hotel_address: Optional[str] = None
     hotel_phone: Optional[str] = None
     hotel_email: Optional[str] = None
+    gst_number: Optional[str] = None
 
 
 @router.get("/hotel", response_model=HotelSettingsResponse)
@@ -50,7 +52,8 @@ def get_hotel_settings(db: Session = Depends(get_db)):
             hotel_name="My Hotel",
             hotel_address="",
             hotel_phone="",
-            hotel_email=""
+            hotel_email="",
+            gst_number=""
         )
         db.add(settings)
         db.commit()
@@ -73,7 +76,8 @@ def update_hotel_settings(
             hotel_name=settings_update.hotel_name or "My Hotel",
             hotel_address=settings_update.hotel_address or "",
             hotel_phone=settings_update.hotel_phone or "",
-            hotel_email=settings_update.hotel_email or ""
+            hotel_email=settings_update.hotel_email or "",
+            gst_number=settings_update.gst_number or ""
         )
         db.add(settings)
     else:
@@ -86,6 +90,8 @@ def update_hotel_settings(
             settings.hotel_phone = settings_update.hotel_phone
         if settings_update.hotel_email is not None:
             settings.hotel_email = settings_update.hotel_email
+        if settings_update.gst_number is not None:
+            settings.gst_number = settings_update.gst_number
 
     db.commit()
     db.refresh(settings)

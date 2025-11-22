@@ -42,18 +42,22 @@ def generate_booking_reference() -> str:
 
 
 def calculate_nights(check_in: date, check_out: date) -> int:
-    """Calculate number of nights between dates"""
-    return (check_out - check_in).days
+    """
+    Calculate number of nights between dates.
+    For same-day bookings, returns 1 (minimum charge is 1 day).
+    """
+    nights = (check_out - check_in).days
+    return max(nights, 1)  # Minimum 1 day charge for same-day bookings
 
 
-def calculate_booking_cost(room_price: float, nights: int, discount: float = 0.0, tax_percentage: float = 12.0) -> dict:
-    """Calculate booking costs including tax and discount"""
+def calculate_booking_cost(room_price: float, nights: int, discount: float = 0.0, tax_percentage: float = 0.0) -> dict:
+    """Calculate booking costs including discount (tax removed as per Indian GST requirements)"""
     total_amount = room_price * nights
     discount_amount = discount
     subtotal = total_amount - discount_amount
     tax_amount = (subtotal * tax_percentage) / 100
     final_amount = subtotal + tax_amount
-    
+
     return {
         "room_price": room_price,
         "total_amount": total_amount,

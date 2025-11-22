@@ -63,6 +63,7 @@ const Billing = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 50 // Increased for day-wise view
   const [hotelName, setHotelName] = useState('My Hotel')
+  const [gstNumber, setGstNumber] = useState('')
   const [methodFilter, setMethodFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
 
@@ -75,6 +76,7 @@ const Billing = () => {
     try {
       const response = await settingsAPI.getHotelSettings()
       setHotelName(response.data.hotel_name || 'My Hotel')
+      setGstNumber(response.data.gst_number || '')
     } catch (err) {
       console.error('Error fetching hotel settings:', err)
     }
@@ -766,7 +768,7 @@ const Billing = () => {
               <LoadingSpinner />
             </Box>
           ) : (
-            <ReceiptComponent ref={receiptRef} invoiceData={invoiceData} hotelName={hotelName} />
+            <ReceiptComponent ref={receiptRef} invoiceData={invoiceData} hotelName={hotelName} gstNumber={gstNumber} />
           )}
         </DialogContent>
         <DialogActions>

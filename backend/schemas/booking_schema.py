@@ -47,10 +47,10 @@ class BookingBase(BaseModel):
     @field_validator('check_out_date')
     @classmethod
     def validate_dates(cls, check_out_date, info):
-        """Validate that check-out is after check-in"""
+        """Validate that check-out is on or after check-in (allows same-day bookings)"""
         check_in_date = info.data.get('check_in_date')
-        if check_in_date and check_out_date <= check_in_date:
-            raise ValueError('Check-out date must be after check-in date')
+        if check_in_date and check_out_date < check_in_date:
+            raise ValueError('Check-out date cannot be before check-in date')
         return check_out_date
 
 

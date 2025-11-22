@@ -32,6 +32,7 @@ const Settings = () => {
     hotel_address: '',
     hotel_phone: '',
     hotel_email: '',
+    gst_number: '',
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -63,6 +64,7 @@ const Settings = () => {
         hotel_address: response.data.hotel_address || '',
         hotel_phone: response.data.hotel_phone || '',
         hotel_email: response.data.hotel_email || '',
+        gst_number: response.data.gst_number || '',
       })
     } catch (err) {
       setError('Failed to load settings')
@@ -268,8 +270,18 @@ const Settings = () => {
               label="Hotel Email"
               value={settings.hotel_email}
               onChange={handleChange('hotel_email')}
-              sx={{ mb: 3 }}
+              sx={{ mb: 2 }}
               type="email"
+            />
+
+            <TextField
+              fullWidth
+              label="GST Number"
+              value={settings.gst_number}
+              onChange={handleChange('gst_number')}
+              sx={{ mb: 3 }}
+              helperText="GST number will appear on receipts and reports"
+              placeholder="e.g., 22AAAAA0000A1Z5"
             />
 
             <Button

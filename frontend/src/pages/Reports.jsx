@@ -26,6 +26,7 @@ const Reports = () => {
   const [reportData, setReportData] = useState(null)
   const [error, setError] = useState('')
   const [hotelName, setHotelName] = useState('My Hotel')
+  const [gstNumber, setGstNumber] = useState('')
 
   // Fetch hotel settings on mount
   useEffect(() => {
@@ -33,6 +34,7 @@ const Reports = () => {
       try {
         const response = await settingsAPI.getHotelSettings()
         setHotelName(response.data.hotel_name || 'My Hotel')
+        setGstNumber(response.data.gst_number || '')
       } catch (err) {
         console.error('Error fetching hotel settings:', err)
       }
@@ -95,7 +97,8 @@ const Reports = () => {
     // Create HTML content for the PDF
     let htmlContent = `
       <div style="padding: 20px; font-family: Arial, sans-serif;">
-        <h1 style="text-align: center; color: #333;">${hotelName} Report</h1>
+        <h1 style="text-align: center; color: #333;">${hotelName}</h1>
+        ${gstNumber ? `<p style="text-align: center; color: #999; font-size: 12px; margin-top: -10px;">GST No: ${gstNumber}</p>` : ''}
         <h2 style="text-align: center; color: #666;">${reportTitles[reportType]}</h2>
         <p style="text-align: center; color: #999;">Date Range: ${dateRangeText}</p>
         <p style="text-align: center; color: #999; margin-bottom: 30px;">Generated: ${new Date().toLocaleString()}</p>

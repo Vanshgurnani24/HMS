@@ -9,6 +9,8 @@ from utils.auth import (
     get_password_hash,
     verify_password,
     create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
     get_current_user,
     require_role
 )
@@ -100,19 +102,91 @@ def login(
         },
         expires_delta=access_token_expires
     )
-    
+
+    # Create refresh token
+    refresh_token_expires = timedelta(days=settings.refresh_token_expire_days)
+    refresh_token = create_refresh_token(
+        data={
+            "sub": user.username,
+            "user_id": user.id,
+            "role": user.role.value
+        },
+        expires_delta=refresh_token_expires
+    )
+
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user": user
     }
+
+
+@router.post("/refresh", response_model=Token)
+def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
+    """
+    Refresh the access token using a valid refresh token.
+
+    - **refresh_token**: Valid refresh token
+
+    Returns a new access token and refresh token.
+    """
+    try:
+        # Decode and verify refresh token
+        token_data = decode_refresh_token(refresh_token)
+
+        # Find user
+        user = db.query(User).filter(User.username == token_data.username).first()
+
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token or inactive user"
+            )
+
+        # Create new access token
+        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+        access_token = create_access_token(
+            data={
+                "sub": user.username,
+                "user_id": user.id,
+                "role": user.role.value
+            },
+            expires_delta=access_token_expires
+        )
+
+        # Create new refresh token
+        refresh_token_expires = timedelta(days=settings.refresh_token_expire_days)
+        new_refresh_token = create_refresh_token(
+            data={
+                "sub": user.username,
+                "user_id": user.id,
+                "role": user.role.value
+            },
+            expires_delta=refresh_token_expires
+        )
+
+        return {
+            "access_token": access_token,
+            "refresh_token": new_refresh_token,
+            "token_type": "bearer",
+            "user": user
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
 
 
 @router.get("/me", response_model=UserResponse)
 def get_current_user_info(current_user: User = Depends(get_current_user)):
     """
     Get current logged-in user information.
-    
+
     Requires: Valid JWT token
     """
     return current_user

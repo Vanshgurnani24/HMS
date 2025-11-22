@@ -19,13 +19,14 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Check if user is already logged in
     const token = localStorage.getItem('token')
+    const refreshToken = localStorage.getItem('refreshToken')
     const savedUser = localStorage.getItem('user')
-    
-    if (token && savedUser) {
+
+    if (token && refreshToken && savedUser) {
       setUser(JSON.parse(savedUser))
       setIsAuthenticated(true)
     }
-    
+
     setLoading(false)
   }, [])
 
@@ -36,14 +37,15 @@ export const AuthProvider = ({ children }) => {
       formData.append('password', password)
 
       const response = await authAPI.login(formData)
-      const { access_token, user: userData } = response.data
+      const { access_token, refresh_token, user: userData } = response.data
 
       localStorage.setItem('token', access_token)
+      localStorage.setItem('refreshToken', refresh_token)
       localStorage.setItem('user', JSON.stringify(userData))
-      
+
       setUser(userData)
       setIsAuthenticated(true)
-      
+
       return { success: true }
     } catch (error) {
       console.error('Login error:', error)
@@ -56,6 +58,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
     setUser(null)
     setIsAuthenticated(false)
